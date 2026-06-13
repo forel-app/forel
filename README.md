@@ -16,6 +16,10 @@
 
 [Download](#installation) · [Documentation](docs/) · [Contributing](CONTRIBUTING.md)
 
+<br/>
+
+<img src="assets/app-screen-1.png" alt="Forel — main view" width="49%" /> <img src="assets/app-screen-2.png" alt="Forel — rule editor" width="49%" />
+
 </div>
 
 > [!WARNING]
@@ -122,6 +126,14 @@ pnpm tauri build
 6. Enable the rule. Forel handles the rest — even when the window is closed.
 
 For a full walkthrough, see the [Getting Started guide](docs/getting-started.md).
+
+---
+
+## Screenshots
+
+![Forel main view — folder list and rule preview](assets/screenshot-main.png)
+
+![Forel rule editor — conditions and actions](assets/screenshot-editor.png)
 
 ---
 
