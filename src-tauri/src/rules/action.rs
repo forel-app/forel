@@ -135,18 +135,23 @@ fn dirs_next() -> Result<std::path::PathBuf> {
 
 const TAGS_XATTR: &str = "com.apple.metadata:_kMDItemUserTags";
 
-/// Adds or removes a named Finder tag on `path`.
+/// Reads the Finder tags on `path`, or an empty list if there are none.
 ///
 /// Tags are stored as a binary-plist–encoded `Vec<String>` in the extended
-/// attribute `com.apple.metadata:_kMDItemUserTags`.  Finder reads them live
-/// so the change is visible immediately without any Finder restart.
-fn apply_file_tag(path: &Path, tag: &str, add: bool) -> Result<()> {
-    // Read the current tag list (empty if the xattr is absent or unreadable).
-    let mut tags: Vec<String> = xattr::get(path, TAGS_XATTR)
+/// attribute `com.apple.metadata:_kMDItemUserTags`. A color label is just a
+/// tag whose name matches a system colour (sometimes suffixed with "\nN").
+pub fn read_file_tags(path: &Path) -> Vec<String> {
+    xattr::get(path, TAGS_XATTR)
         .ok()
         .flatten()
         .and_then(|bytes| plist::from_bytes::<Vec<String>>(&bytes).ok())
-        .unwrap_or_default();
+        .unwrap_or_default()
+}
+
+/// Adds or removes a named Finder tag on `path`. Finder reads tags live so the
+/// change is visible immediately without any Finder restart.
+fn apply_file_tag(path: &Path, tag: &str, add: bool) -> Result<()> {
+    let mut tags = read_file_tags(path);
 
     if add {
         if !tags.iter().any(|t| t == tag) {

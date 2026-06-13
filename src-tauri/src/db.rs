@@ -290,6 +290,7 @@ fn condition_kind_to_str(k: &ConditionKind) -> &'static str {
         ConditionKind::Extension => "extension",
         ConditionKind::Kind => "kind",
         ConditionKind::SizeBytes => "size_bytes",
+        ConditionKind::ColorLabel => "color_label",
         ConditionKind::Contents => "contents",
     }
 }
@@ -299,6 +300,7 @@ fn parse_condition_kind(s: &str) -> ConditionKind {
         "extension" => ConditionKind::Extension,
         "kind" => ConditionKind::Kind,
         "size_bytes" => ConditionKind::SizeBytes,
+        "color_label" => ConditionKind::ColorLabel,
         "contents" => ConditionKind::Contents,
         _ => ConditionKind::Name,
     }

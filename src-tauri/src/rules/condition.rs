@@ -45,6 +45,20 @@ pub fn evaluate(condition: &Condition, path: &Path) -> Result<bool> {
             })
         }
 
+        ConditionKind::ColorLabel => {
+            let target = condition.value.to_lowercase();
+            let has = super::action::read_file_tags(path).iter().any(|tag| {
+                // A label may be stored as "Red\n6" — compare the name part only.
+                let name = tag.split('\n').next().unwrap_or(tag).trim().to_lowercase();
+                name == target
+            });
+            Ok(match condition.operator {
+                Operator::Is => has,
+                Operator::IsNot => !has,
+                _ => false,
+            })
+        }
+
         ConditionKind::Contents => {
             let text = std::fs::read_to_string(path).unwrap_or_default();
             Ok(match_string(&condition.operator, &text, &condition.value))

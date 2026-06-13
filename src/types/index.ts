@@ -12,6 +12,7 @@ export type ConditionKind =
   | "extension"
   | "kind"
   | "size_bytes"
+  | "color_label"
   | "contents";
 
 export type Operator =
@@ -69,6 +70,7 @@ export const CONDITION_KIND_LABELS: Record<ConditionKind, string> = {
   extension: "Extension",
   kind: "Kind",
   size_bytes: "Size",
+  color_label: "Color label",
   contents: "Contents",
 };
 

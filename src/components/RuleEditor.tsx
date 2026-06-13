@@ -27,7 +27,7 @@ const STRING_OPERATORS: Operator[] = [
   "starts_with", "ends_with", "matches_regex",
 ];
 const NUMBER_OPERATORS: Operator[] = ["is", "is_not", "greater_than", "less_than"];
-const KIND_OPERATORS: Operator[] = ["is", "is_not"];
+const PRESENCE_OPERATORS: Operator[] = ["is", "is_not"];
 
 const KIND_OPTIONS: { value: string; label: string }[] = [
   { value: "image",        label: "Image" },
@@ -43,9 +43,12 @@ const KIND_OPTIONS: { value: string; label: string }[] = [
   { value: "application",  label: "Application" },
 ];
 
+// The 7 macOS system color labels, in Finder order.
+const COLOR_LABELS = ["Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Gray"];
+
 function operatorsFor(kind: ConditionKind): Operator[] {
   if (kind === "size_bytes") return NUMBER_OPERATORS;
-  if (kind === "kind") return KIND_OPERATORS;
+  if (kind === "kind" || kind === "color_label") return PRESENCE_OPERATORS;
   return STRING_OPERATORS;
 }
 
@@ -220,7 +223,9 @@ function ConditionRow({
         value={condition.kind}
         onChange={(e) => {
           const kind = e.target.value as ConditionKind;
-          const defaultValue = kind === "kind" ? KIND_OPTIONS[0].value : "";
+          let defaultValue = "";
+          if (kind === "kind") defaultValue = KIND_OPTIONS[0].value;
+          else if (kind === "color_label") defaultValue = COLOR_LABELS[0];
           onChange({ kind, operator: operatorsFor(kind)[0], value: defaultValue });
         }}
       >
@@ -254,6 +259,24 @@ function ConditionRow({
             </option>
           ))}
         </select>
+      ) : condition.kind === "color_label" ? (
+        <div className="tag-picker">
+          {COLOR_LABELS.map((label) => {
+            const selected = condition.value === label;
+            return (
+              <button
+                key={label}
+                type="button"
+                className={`tag-dot${selected ? " tag-dot--active" : ""}`}
+                style={{ backgroundColor: MACOS_TAG_COLORS[label] }}
+                title={label}
+                onClick={() => onChange({ value: label })}
+              >
+                {selected && <Check size={9} color="#fff" strokeWidth={3} />}
+              </button>
+            );
+          })}
+        </div>
       ) : condition.kind === "size_bytes" ? (
         <input
           className="condition-value"

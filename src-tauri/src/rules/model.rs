@@ -65,6 +65,7 @@ pub enum ConditionKind {
     Extension,
     Kind,
     SizeBytes,
+    ColorLabel,
     Contents,
 }
 
