@@ -27,11 +27,25 @@ const STRING_OPERATORS: Operator[] = [
   "starts_with", "ends_with", "matches_regex",
 ];
 const NUMBER_OPERATORS: Operator[] = ["is", "is_not", "greater_than", "less_than"];
-const DATE_OPERATORS: Operator[] = ["is", "is_not", "before", "after"];
+const KIND_OPERATORS: Operator[] = ["is", "is_not"];
+
+const KIND_OPTIONS: { value: string; label: string }[] = [
+  { value: "image",        label: "Image" },
+  { value: "movie",        label: "Movie" },
+  { value: "music",        label: "Music" },
+  { value: "pdf",          label: "PDF" },
+  { value: "text",         label: "Text" },
+  { value: "document",     label: "Document" },
+  { value: "presentation", label: "Presentation" },
+  { value: "archive",      label: "Archive" },
+  { value: "disk_image",   label: "Disk Image" },
+  { value: "folder",       label: "Folder" },
+  { value: "application",  label: "Application" },
+];
 
 function operatorsFor(kind: ConditionKind): Operator[] {
   if (kind === "size_bytes") return NUMBER_OPERATORS;
-  if (kind === "date_created" || kind === "date_modified") return DATE_OPERATORS;
+  if (kind === "kind") return KIND_OPERATORS;
   return STRING_OPERATORS;
 }
 
@@ -204,9 +218,11 @@ function ConditionRow({
     <div className="condition-row">
       <select
         value={condition.kind}
-        onChange={(e) =>
-          onChange({ kind: e.target.value as ConditionKind, operator: ops[0], value: "" })
-        }
+        onChange={(e) => {
+          const kind = e.target.value as ConditionKind;
+          const defaultValue = kind === "kind" ? KIND_OPTIONS[0].value : "";
+          onChange({ kind, operator: operatorsFor(kind)[0], value: defaultValue });
+        }}
       >
         {(Object.keys(CONDITION_KIND_LABELS) as ConditionKind[]).map((k) => (
           <option key={k} value={k}>
@@ -226,12 +242,35 @@ function ConditionRow({
         ))}
       </select>
 
-      <input
-        className="condition-value"
-        value={condition.value}
-        placeholder="value"
-        onChange={(e) => onChange({ value: e.target.value })}
-      />
+      {condition.kind === "kind" ? (
+        <select
+          className="condition-value"
+          value={condition.value || KIND_OPTIONS[0].value}
+          onChange={(e) => onChange({ value: e.target.value })}
+        >
+          {KIND_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      ) : condition.kind === "size_bytes" ? (
+        <input
+          className="condition-value"
+          type="number"
+          min={0}
+          value={condition.value}
+          placeholder="bytes"
+          onChange={(e) => onChange({ value: e.target.value })}
+        />
+      ) : (
+        <input
+          className="condition-value"
+          value={condition.value}
+          placeholder="value"
+          onChange={(e) => onChange({ value: e.target.value })}
+        />
+      )}
 
       <button className="row-remove" onClick={onRemove}>
         <Minus size={12} />

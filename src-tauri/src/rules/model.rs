@@ -65,9 +65,6 @@ pub enum ConditionKind {
     Extension,
     Kind,
     SizeBytes,
-    DateCreated,
-    DateModified,
-    Tags,
     Contents,
 }
 
@@ -83,8 +80,6 @@ pub enum Operator {
     MatchesRegex,
     GreaterThan,
     LessThan,
-    Before,
-    After,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

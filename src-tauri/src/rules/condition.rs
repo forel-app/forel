@@ -10,10 +10,7 @@ pub fn evaluate(condition: &Condition, path: &Path) -> Result<bool> {
 
     match &condition.kind {
         ConditionKind::Name => {
-            let name = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("");
+            let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
             Ok(match_string(&condition.operator, name, &condition.value))
         }
 
@@ -23,16 +20,17 @@ pub fn evaluate(condition: &Condition, path: &Path) -> Result<bool> {
                 .and_then(|s| s.to_str())
                 .unwrap_or("")
                 .to_lowercase();
-            Ok(match_string(
-                &condition.operator,
-                &ext,
-                &condition.value.to_lowercase(),
-            ))
+            let value = condition.value.trim_start_matches('.').to_lowercase();
+            Ok(match_string(&condition.operator, &ext, &value))
         }
 
         ConditionKind::Kind => {
-            let kind_str = if meta.is_dir() { "folder" } else { "file" };
-            Ok(match_string(&condition.operator, kind_str, &condition.value))
+            let detected = detect_kind(path, &meta);
+            Ok(match condition.operator {
+                Operator::Is => detected == condition.value,
+                Operator::IsNot => detected != condition.value,
+                _ => false,
+            })
         }
 
         ConditionKind::SizeBytes => {
@@ -47,37 +45,60 @@ pub fn evaluate(condition: &Condition, path: &Path) -> Result<bool> {
             })
         }
 
-        ConditionKind::DateModified => {
-            let modified = meta.modified()?.duration_since(std::time::UNIX_EPOCH)?.as_secs();
-            let threshold: u64 = condition.value.parse().unwrap_or(0);
-            Ok(match condition.operator {
-                Operator::Is => modified == threshold,
-                Operator::IsNot => modified != threshold,
-                Operator::Before => modified < threshold,
-                Operator::After => modified > threshold,
-                _ => false,
-            })
-        }
-
-        ConditionKind::DateCreated => {
-            let created = meta.created()?.duration_since(std::time::UNIX_EPOCH)?.as_secs();
-            let threshold: u64 = condition.value.parse().unwrap_or(0);
-            Ok(match condition.operator {
-                Operator::Is => created == threshold,
-                Operator::IsNot => created != threshold,
-                Operator::Before => created < threshold,
-                Operator::After => created > threshold,
-                _ => false,
-            })
-        }
-
         ConditionKind::Contents => {
             let text = std::fs::read_to_string(path).unwrap_or_default();
             Ok(match_string(&condition.operator, &text, &condition.value))
         }
+    }
+}
 
-        // macOS-only: tags require xattr parsing (stubbed for now)
-        ConditionKind::Tags => Ok(false),
+/// Classifies a file into a Hazel-style kind string based on its extension.
+fn detect_kind(path: &Path, meta: &std::fs::Metadata) -> &'static str {
+    if meta.is_dir() {
+        return if path.extension().and_then(|e| e.to_str()) == Some("app") {
+            "application"
+        } else {
+            "folder"
+        };
+    }
+
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase());
+
+    match ext.as_deref() {
+        Some(
+            "jpg" | "jpeg" | "png" | "gif" | "bmp" | "tiff" | "tif" | "webp" | "svg" | "heic"
+            | "heif" | "raw" | "cr2" | "cr3" | "nef" | "arw" | "dng",
+        ) => "image",
+
+        Some("mp4" | "mov" | "avi" | "mkv" | "m4v" | "wmv" | "flv" | "webm" | "mpg" | "mpeg") => {
+            "movie"
+        }
+
+        Some("mp3" | "aac" | "flac" | "wav" | "aiff" | "aif" | "m4a" | "ogg" | "wma" | "opus") => {
+            "music"
+        }
+
+        Some("pdf") => "pdf",
+
+        Some("txt" | "md" | "markdown" | "rtf" | "rst" | "log") => "text",
+
+        Some("ppt" | "pptx" | "key" | "odp") => "presentation",
+
+        Some(
+            "zip" | "tar" | "gz" | "bz2" | "7z" | "rar" | "xz" | "zst" | "tgz" | "tbz" | "cab",
+        ) => "archive",
+
+        Some("dmg" | "iso" | "img" | "sparseimage" | "sparsebundle") => "disk_image",
+
+        Some(
+            "doc" | "docx" | "odt" | "pages" | "xls" | "xlsx" | "ods" | "numbers" | "csv"
+            | "epub",
+        ) => "document",
+
+        _ => "document",
     }
 }
 

@@ -290,9 +290,6 @@ fn condition_kind_to_str(k: &ConditionKind) -> &'static str {
         ConditionKind::Extension => "extension",
         ConditionKind::Kind => "kind",
         ConditionKind::SizeBytes => "size_bytes",
-        ConditionKind::DateCreated => "date_created",
-        ConditionKind::DateModified => "date_modified",
-        ConditionKind::Tags => "tags",
         ConditionKind::Contents => "contents",
     }
 }
@@ -302,9 +299,6 @@ fn parse_condition_kind(s: &str) -> ConditionKind {
         "extension" => ConditionKind::Extension,
         "kind" => ConditionKind::Kind,
         "size_bytes" => ConditionKind::SizeBytes,
-        "date_created" => ConditionKind::DateCreated,
-        "date_modified" => ConditionKind::DateModified,
-        "tags" => ConditionKind::Tags,
         "contents" => ConditionKind::Contents,
         _ => ConditionKind::Name,
     }
@@ -321,8 +315,6 @@ fn operator_to_str(op: &Operator) -> &'static str {
         Operator::MatchesRegex => "matches_regex",
         Operator::GreaterThan => "greater_than",
         Operator::LessThan => "less_than",
-        Operator::Before => "before",
-        Operator::After => "after",
     }
 }
 
@@ -336,8 +328,6 @@ fn parse_operator(s: &str) -> Operator {
         "matches_regex" => Operator::MatchesRegex,
         "greater_than" => Operator::GreaterThan,
         "less_than" => Operator::LessThan,
-        "before" => Operator::Before,
-        "after" => Operator::After,
         _ => Operator::Is,
     }
 }

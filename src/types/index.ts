@@ -12,9 +12,6 @@ export type ConditionKind =
   | "extension"
   | "kind"
   | "size_bytes"
-  | "date_created"
-  | "date_modified"
-  | "tags"
   | "contents";
 
 export type Operator =
@@ -26,9 +23,7 @@ export type Operator =
   | "ends_with"
   | "matches_regex"
   | "greater_than"
-  | "less_than"
-  | "before"
-  | "after";
+  | "less_than";
 
 export interface Condition {
   id: string;
@@ -74,9 +69,6 @@ export const CONDITION_KIND_LABELS: Record<ConditionKind, string> = {
   extension: "Extension",
   kind: "Kind",
   size_bytes: "Size",
-  date_created: "Date created",
-  date_modified: "Date modified",
-  tags: "Tags",
   contents: "Contents",
 };
 
@@ -90,8 +82,6 @@ export const OPERATOR_LABELS: Record<Operator, string> = {
   matches_regex: "matches regex",
   greater_than: "greater than",
   less_than: "less than",
-  before: "is before",
-  after: "is after",
 };
 
 export const ACTION_KIND_LABELS: Record<ActionKind, string> = {
