@@ -192,8 +192,23 @@ pub fn preview(action: &Action, path: &Path) -> Result<String> {
     })
 }
 
+fn format_file_size(bytes: u64) -> String {
+    const KB: u64 = 1_024;
+    const MB: u64 = 1_024 * KB;
+    const GB: u64 = 1_024 * MB;
+    if bytes >= GB {
+        format!("{:.1}GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.1}MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.1}KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{}B", bytes)
+    }
+}
+
 /// Substitutes tokens in rename patterns.
-/// Supported tokens: {name}, {extension}, {date_created}, {date_modified}
+/// Supported tokens: {name}, {extension}, {date_created}, {date_modified}, {current_date}, {size}
 fn apply_rename_pattern(pattern: &str, path: &Path) -> Result<String> {
     let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
     let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
@@ -201,12 +216,16 @@ fn apply_rename_pattern(pattern: &str, path: &Path) -> Result<String> {
     let meta = std::fs::metadata(path)?;
     let modified: chrono::DateTime<chrono::Local> = meta.modified()?.into();
     let created: chrono::DateTime<chrono::Local> = meta.created()?.into();
+    let today = chrono::Local::now();
+    let size_str = format_file_size(meta.len());
 
     let result = pattern
         .replace("{name}", stem)
         .replace("{extension}", ext)
         .replace("{date_modified}", &modified.format("%Y-%m-%d").to_string())
-        .replace("{date_created}", &created.format("%Y-%m-%d").to_string());
+        .replace("{date_created}", &created.format("%Y-%m-%d").to_string())
+        .replace("{current_date}", &today.format("%Y-%m-%d").to_string())
+        .replace("{size}", &size_str);
 
     if result.is_empty() {
         bail!("rename pattern produced empty filename");

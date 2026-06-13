@@ -720,3 +720,115 @@ input, select, textarea { font-family: inherit; font-size: 13px; color: var(--te
   align-items: center;
 }
 .tag-custom-clear:hover { color: var(--danger); background: rgba(255, 59, 48, 0.1); }
+
+/* ---- Rename pattern editor ---- */
+.rename-pattern-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rename-pattern-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 3px 8px;
+  background: var(--bg-control);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  cursor: text;
+}
+.rename-pattern-field:focus-within {
+  border-color: var(--accent);
+}
+
+.rename-pattern-placeholder {
+  color: var(--text-secondary);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.rename-token-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px 2px 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.rename-token-chip-remove {
+  display: flex;
+  align-items: center;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 0;
+}
+.rename-token-chip-remove:hover { color: #fff; }
+
+.rename-text-inline {
+  background: none;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  color: var(--text);
+  min-width: 30px;
+  width: auto;
+  padding: 0;
+  line-height: 1.4;
+}
+
+.rename-text-span {
+  font-size: 13px;
+  color: var(--text);
+  cursor: text;
+  line-height: 1.4;
+}
+
+.rename-token-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.rename-palette-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 11px;
+  background: var(--bg-control);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  transition: background 0.1s, border-color 0.1s;
+  white-space: nowrap;
+}
+.rename-palette-btn:hover { background: var(--bg-control-hover); }
+.rename-palette-btn--used {
+  background: rgba(10, 132, 255, 0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---- Rename preview ---- */
+.rename-preview {
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 2px 1px;
+}
+.rename-preview-label {
+  font-weight: 500;
+}
+.rename-preview-value {
+  font-family: ui-monospace, "SF Mono", monospace;
+  color: var(--text);
+}
