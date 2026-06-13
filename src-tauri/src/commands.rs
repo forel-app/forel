@@ -170,14 +170,13 @@ pub fn run_rules_now(folder_id: String, state: State<AppState>) -> Result<Vec<St
     Ok(all_matched)
 }
 
-/// Returns the macOS Finder tags available on this machine.
-/// Always includes the 7 system colour tags; appends any custom user tags.
+/// Returns all available tags: 7 system colours + Finder favourites + custom tags stored in DB.
 #[tauri::command]
-pub fn get_macos_tags() -> Vec<String> {
+pub fn get_macos_tags(state: State<AppState>) -> Vec<String> {
     let system = ["Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Gray"];
     let mut tags: Vec<String> = system.iter().map(|s| s.to_string()).collect();
 
-    // Try to read extra user-defined tags from Finder preferences
+    // Finder favourite tags
     if let Ok(out) = std::process::Command::new("defaults")
         .args(["read", "com.apple.finder", "FavoriteTagNames"])
         .output()
@@ -195,5 +194,27 @@ pub fn get_macos_tags() -> Vec<String> {
         }
     }
 
+    // User-defined tags stored in our DB
+    if let Ok(conn) = state.db.lock() {
+        if let Ok(custom) = db::list_custom_tags(&conn) {
+            for name in custom {
+                if !tags.contains(&name) {
+                    tags.push(name);
+                }
+            }
+        }
+    }
+
     tags
+}
+
+/// Persists a user-defined tag so it appears in the picker across sessions.
+#[tauri::command]
+pub fn add_custom_tag(name: String, state: State<AppState>) -> Result<(), String> {
+    let name = name.trim().to_string();
+    if name.is_empty() {
+        return Err("tag name cannot be empty".into());
+    }
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::insert_custom_tag(&conn, &name).map_err(|e| e.to_string())
 }

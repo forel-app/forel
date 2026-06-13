@@ -346,33 +346,90 @@ function MacTagPicker({
   value: string;
   onChange: (tag: string) => void;
 }) {
-  const [tags, setTags] = useState<string[]>(Object.keys(MACOS_TAG_COLORS));
+  const [allTags, setAllTags] = useState<string[]>(Object.keys(MACOS_TAG_COLORS));
+  const [customInput, setCustomInput] = useState("");
 
-  useEffect(() => {
+  const loadTags = () => {
     invoke<string[]>("get_macos_tags")
-      .then(setTags)
-      .catch(() => {}); // fallback: keep the 7 system colours
-  }, []);
+      .then(setAllTags)
+      .catch(() => {});
+  };
+
+  useEffect(loadTags, []);
+
+  const systemTags = Object.keys(MACOS_TAG_COLORS);
+  const userTags = allTags.filter((t) => !systemTags.includes(t));
+
+  const applyCustom = async () => {
+    const tag = customInput.trim();
+    if (!tag) return;
+    await invoke("add_custom_tag", { name: tag }).catch(() => {});
+    onChange(tag);
+    setCustomInput("");
+    loadTags();
+  };
 
   return (
-    <div className="tag-picker">
-      {tags.map((tag) => {
-        const color = MACOS_TAG_COLORS[tag] ?? "#8E8E93";
-        const selected = value === tag;
-        return (
-          <button
-            key={tag}
-            className={`tag-dot${selected ? " tag-dot--active" : ""}`}
-            style={{ backgroundColor: color }}
-            title={tag}
-            onClick={() => onChange(selected ? "" : tag)}
-          >
-            {selected && <Check size={9} color="#fff" strokeWidth={3} />}
+    <div className="tag-picker-wrap">
+      {/* System color dots */}
+      <div className="tag-picker">
+        {systemTags.map((tag) => {
+          const selected = value === tag;
+          return (
+            <button
+              key={tag}
+              className={`tag-dot${selected ? " tag-dot--active" : ""}`}
+              style={{ backgroundColor: MACOS_TAG_COLORS[tag] }}
+              title={tag}
+              onClick={() => onChange(selected ? "" : tag)}
+            >
+              {selected && <Check size={9} color="#fff" strokeWidth={3} />}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* User-defined Finder tags */}
+      {userTags.length > 0 && (
+        <div className="tag-user-list">
+          {userTags.map((tag) => (
+            <button
+              key={tag}
+              className={`tag-user-pill${value === tag ? " tag-user-pill--active" : ""}`}
+              onClick={() => onChange(value === tag ? "" : tag)}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Custom tag input */}
+      <div className="tag-custom-input-row">
+        <input
+          className="tag-custom-input"
+          value={customInput}
+          placeholder="Custom tag…"
+          onChange={(e) => setCustomInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && applyCustom()}
+        />
+        <button
+          className="btn btn-secondary btn-sm"
+          onClick={applyCustom}
+          disabled={!customInput.trim()}
+        >
+          <Plus size={11} />
+        </button>
+      </div>
+
+      {/* Show selected custom tag (not in any known list) */}
+      {value && !systemTags.includes(value) && !userTags.includes(value) && (
+        <div className="tag-custom-selected">
+          <span className="tag-custom-label">{value}</span>
+          <button className="tag-custom-clear" onClick={() => onChange("")}>
+            <X size={10} />
           </button>
-        );
-      })}
-      {value && !tags.includes(value) && (
-        <span className="tag-custom-label">{value}</span>
+        </div>
       )}
     </div>
   );

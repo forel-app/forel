@@ -77,6 +77,7 @@ pub fn run() {
             commands::toggle_rule,
             commands::run_rules_now,
             commands::get_macos_tags,
+            commands::add_custom_tag,
         ])
         .run(tauri::generate_context!())
         .expect("error while running forel");

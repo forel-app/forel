@@ -307,13 +307,18 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 .row-remove:hover { color: var(--danger); background: rgba(255,59,48,0.08); }
 
 /* ---- macOS tag picker ---- */
+.tag-picker-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
 .tag-picker {
   display: flex;
   align-items: center;
   gap: 7px;
-  flex: 1;
   flex-wrap: wrap;
-  padding: 2px 0;
 }
 
 .tag-dot {
@@ -325,12 +330,57 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
   justify-content: center;
   flex-shrink: 0;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
-  /* ring made with box-shadow so it doesn't shift layout */
   box-shadow: 0 0 0 2px transparent;
 }
 .tag-dot:hover { transform: scale(1.18); }
 .tag-dot--active {
   box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px rgba(0, 0, 0, 0.25);
+}
+
+/* User-defined Finder tags */
+.tag-user-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.tag-user-pill {
+  font-size: 11px;
+  padding: 2px 9px;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.06);
+  color: var(--text);
+  border: 1px solid transparent;
+  transition: background 0.1s;
+}
+.tag-user-pill:hover { background: rgba(0,0,0,0.11); }
+.tag-user-pill--active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Custom tag input row */
+.tag-custom-input-row {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.tag-custom-input {
+  flex: 1;
+  border: 1px solid #d0d0d0;
+  border-radius: var(--radius);
+  padding: 3px 8px;
+  background: #fafafa;
+  font-size: 12px;
+}
+.tag-custom-input:focus { outline: none; border-color: var(--accent); }
+
+/* Selected custom tag badge */
+.tag-custom-selected {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .tag-custom-label {
@@ -340,3 +390,12 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
   background: rgba(0,0,0,0.06);
   border-radius: 10px;
 }
+
+.tag-custom-clear {
+  color: var(--text-secondary);
+  padding: 2px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+}
+.tag-custom-clear:hover { color: var(--danger); background: rgba(255,59,48,0.08); }

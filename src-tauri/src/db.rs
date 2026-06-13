@@ -41,9 +41,29 @@ pub fn init(conn: &Connection) -> Result<()> {
              kind      TEXT NOT NULL,
              params    TEXT NOT NULL,
              position  INTEGER NOT NULL DEFAULT 0
+         );
+
+         CREATE TABLE IF NOT EXISTS custom_tags (
+             name TEXT PRIMARY KEY
          );",
     )
     .context("schema init")
+}
+
+// ---------- Custom tags ----------
+
+pub fn list_custom_tags(conn: &Connection) -> Result<Vec<String>> {
+    let mut stmt = conn.prepare("SELECT name FROM custom_tags ORDER BY name")?;
+    let rows = stmt.query_map([], |row| row.get(0))?;
+    rows.collect::<rusqlite::Result<_>>().context("list custom tags")
+}
+
+pub fn insert_custom_tag(conn: &Connection, name: &str) -> Result<()> {
+    conn.execute(
+        "INSERT OR IGNORE INTO custom_tags (name) VALUES (?1)",
+        params![name],
+    )?;
+    Ok(())
 }
 
 // ---------- WatchedFolder ----------
