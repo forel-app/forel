@@ -284,6 +284,9 @@ input, select, textarea { font-family: inherit; font-size: 13px; }
 
 .action-folder-picker { display: flex; gap: 6px; flex: 1; align-items: center; }
 
+.size-value { display: flex; gap: 6px; flex: 1; align-items: center; }
+.size-value .condition-value { flex: 1; }
+
 .action-script {
   flex: 1;
   border: 1px solid #d0d0d0;

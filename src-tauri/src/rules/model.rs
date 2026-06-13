@@ -65,6 +65,7 @@ pub enum ConditionKind {
     Extension,
     Kind,
     SizeBytes,
+    Tags,
     ColorLabel,
     Contents,
 }
@@ -105,6 +106,7 @@ pub enum ActionKind {
     Delete,
     AddTag,
     RemoveTag,
+    SetColorLabel,
     RunScript,
 }
 

@@ -12,6 +12,7 @@ export type ConditionKind =
   | "extension"
   | "kind"
   | "size_bytes"
+  | "tags"
   | "color_label"
   | "contents";
 
@@ -42,6 +43,7 @@ export type ActionKind =
   | "delete"
   | "add_tag"
   | "remove_tag"
+  | "set_color_label"
   | "run_script";
 
 export interface Action {
@@ -70,6 +72,7 @@ export const CONDITION_KIND_LABELS: Record<ConditionKind, string> = {
   extension: "Extension",
   kind: "Kind",
   size_bytes: "Size",
+  tags: "Tags",
   color_label: "Color label",
   contents: "Contents",
 };
@@ -94,5 +97,6 @@ export const ACTION_KIND_LABELS: Record<ActionKind, string> = {
   delete: "Delete",
   add_tag: "Add tag",
   remove_tag: "Remove tag",
+  set_color_label: "Set color label",
   run_script: "Run script",
 };

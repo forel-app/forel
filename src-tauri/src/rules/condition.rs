@@ -35,12 +35,33 @@ pub fn evaluate(condition: &Condition, path: &Path) -> Result<bool> {
 
         ConditionKind::SizeBytes => {
             let size = meta.len();
-            let threshold: u64 = condition.value.parse().unwrap_or(0);
+            let threshold = parse_size(&condition.value);
             Ok(match condition.operator {
                 Operator::Is => size == threshold,
                 Operator::IsNot => size != threshold,
                 Operator::GreaterThan => size > threshold,
                 Operator::LessThan => size < threshold,
+                _ => false,
+            })
+        }
+
+        ConditionKind::Tags => {
+            let target = condition.value.to_lowercase();
+            // Tag names only (drop the "\nN" colour-index suffix if present).
+            let names: Vec<String> = super::action::read_file_tags(path)
+                .iter()
+                .map(|t| t.split('\n').next().unwrap_or(t).trim().to_lowercase())
+                .collect();
+            Ok(match condition.operator {
+                Operator::Is => names.iter().any(|n| *n == target),
+                Operator::IsNot => !names.iter().any(|n| *n == target),
+                Operator::Contains => names.iter().any(|n| n.contains(target.as_str())),
+                Operator::DoesNotContain => !names.iter().any(|n| n.contains(target.as_str())),
+                Operator::StartsWith => names.iter().any(|n| n.starts_with(target.as_str())),
+                Operator::EndsWith => names.iter().any(|n| n.ends_with(target.as_str())),
+                Operator::MatchesRegex => regex::Regex::new(&condition.value)
+                    .map(|re| names.iter().any(|n| re.is_match(n)))
+                    .unwrap_or(false),
                 _ => false,
             })
         }
@@ -129,4 +150,22 @@ fn match_string(operator: &Operator, haystack: &str, needle: &str) -> bool {
             .unwrap_or(false),
         _ => false,
     }
+}
+
+/// Parses a size threshold into bytes. Accepts a plain number ("5242880") or a
+/// number with a unit suffix ("5 MB", "100kb"). Unitless values are bytes.
+fn parse_size(value: &str) -> u64 {
+    let s = value.trim();
+    let split = s
+        .find(|c: char| !c.is_ascii_digit() && c != '.')
+        .unwrap_or(s.len());
+    let (num, unit) = s.split_at(split);
+    let n: f64 = num.trim().parse().unwrap_or(0.0);
+    let mult = match unit.trim().to_lowercase().as_str() {
+        "kb" => 1024.0,
+        "mb" => 1024.0 * 1024.0,
+        "gb" => 1024.0 * 1024.0 * 1024.0,
+        _ => 1.0,
+    };
+    (n * mult) as u64
 }

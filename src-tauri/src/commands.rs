@@ -170,13 +170,16 @@ pub fn run_rules_now(folder_id: String, state: State<AppState>) -> Result<Vec<St
     Ok(all_matched)
 }
 
-/// Returns all available tags: 7 system colours + Finder favourites + custom tags stored in DB.
+/// Returns the available text tags: Finder favourites + custom tags from the DB.
+/// The 7 system colour names are excluded — colours are handled by the
+/// colour-label picker, not as text tags.
 #[tauri::command]
 pub fn get_macos_tags(state: State<AppState>) -> Vec<String> {
-    let system = ["Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Gray"];
-    let mut tags: Vec<String> = system.iter().map(|s| s.to_string()).collect();
+    let colors = ["red", "orange", "yellow", "green", "blue", "purple", "gray", "grey"];
+    let is_color = |name: &str| colors.contains(&name.to_lowercase().as_str());
+    let mut tags: Vec<String> = Vec::new();
 
-    // Finder favourite tags
+    // Finder favourite tags (skipping the system colour labels)
     if let Ok(out) = std::process::Command::new("defaults")
         .args(["read", "com.apple.finder", "FavoriteTagNames"])
         .output()
@@ -184,7 +187,7 @@ pub fn get_macos_tags(state: State<AppState>) -> Vec<String> {
         if let Ok(text) = String::from_utf8(out.stdout) {
             for line in text.lines() {
                 let name = line.trim().trim_end_matches(',').trim_matches('"');
-                if !name.is_empty() && name != "(" && name != ")" {
+                if !name.is_empty() && name != "(" && name != ")" && !is_color(name) {
                     let s = name.to_string();
                     if !tags.contains(&s) {
                         tags.push(s);
@@ -198,7 +201,7 @@ pub fn get_macos_tags(state: State<AppState>) -> Vec<String> {
     if let Ok(conn) = state.db.lock() {
         if let Ok(custom) = db::list_custom_tags(&conn) {
             for name in custom {
-                if !tags.contains(&name) {
+                if !is_color(&name) && !tags.contains(&name) {
                     tags.push(name);
                 }
             }

@@ -290,6 +290,7 @@ fn condition_kind_to_str(k: &ConditionKind) -> &'static str {
         ConditionKind::Extension => "extension",
         ConditionKind::Kind => "kind",
         ConditionKind::SizeBytes => "size_bytes",
+        ConditionKind::Tags => "tags",
         ConditionKind::ColorLabel => "color_label",
         ConditionKind::Contents => "contents",
     }
@@ -300,6 +301,7 @@ fn parse_condition_kind(s: &str) -> ConditionKind {
         "extension" => ConditionKind::Extension,
         "kind" => ConditionKind::Kind,
         "size_bytes" => ConditionKind::SizeBytes,
+        "tags" => ConditionKind::Tags,
         "color_label" => ConditionKind::ColorLabel,
         "contents" => ConditionKind::Contents,
         _ => ConditionKind::Name,
@@ -343,6 +345,7 @@ fn action_kind_to_str(k: &ActionKind) -> &'static str {
         ActionKind::Delete => "delete",
         ActionKind::AddTag => "add_tag",
         ActionKind::RemoveTag => "remove_tag",
+        ActionKind::SetColorLabel => "set_color_label",
         ActionKind::RunScript => "run_script",
     }
 }
@@ -355,6 +358,7 @@ fn parse_action_kind(s: &str) -> ActionKind {
         "delete" => ActionKind::Delete,
         "add_tag" => ActionKind::AddTag,
         "remove_tag" => ActionKind::RemoveTag,
+        "set_color_label" => ActionKind::SetColorLabel,
         "run_script" => ActionKind::RunScript,
         _ => ActionKind::MoveToFolder,
     }

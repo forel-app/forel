@@ -77,6 +77,15 @@ pub fn execute(action: &Action, path: &Path) -> Result<()> {
             apply_file_tag(path, tag, false)?;
         }
 
+        ActionKind::SetColorLabel => {
+            let color = action
+                .params
+                .get("color")
+                .and_then(|v| v.as_str())
+                .context("SetColorLabel requires 'color' param")?;
+            set_color_label(path, color)?;
+        }
+
         ActionKind::RunScript => {
             let script = action
                 .params
@@ -148,6 +157,15 @@ pub fn read_file_tags(path: &Path) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Serialises `tags` to a binary plist and writes them to the xattr.
+fn write_file_tags(path: &Path, tags: &[String]) -> Result<()> {
+    let mut buf: Vec<u8> = Vec::new();
+    plist::to_writer_binary(std::io::Cursor::new(&mut buf), &tags)
+        .context("failed to serialise tags plist")?;
+    xattr::set(path, TAGS_XATTR, &buf).context("failed to write tags xattr")?;
+    Ok(())
+}
+
 /// Adds or removes a named Finder tag on `path`. Finder reads tags live so the
 /// change is visible immediately without any Finder restart.
 fn apply_file_tag(path: &Path, tag: &str, add: bool) -> Result<()> {
@@ -161,11 +179,48 @@ fn apply_file_tag(path: &Path, tag: &str, add: bool) -> Result<()> {
         tags.retain(|t| t != tag);
     }
 
-    // Serialise back to binary plist and write the xattr.
-    let mut buf: Vec<u8> = Vec::new();
-    plist::to_writer_binary(std::io::Cursor::new(&mut buf), &tags)
-        .context("failed to serialise tags plist")?;
-    xattr::set(path, TAGS_XATTR, &buf).context("failed to write tags xattr")?;
+    write_file_tags(path, &tags)
+}
 
-    Ok(())
+/// Finder colour-label index for each of the 7 system colours.
+fn color_index(name: &str) -> Option<u8> {
+    match name.to_lowercase().as_str() {
+        "gray" | "grey" => Some(1),
+        "green" => Some(2),
+        "purple" => Some(3),
+        "blue" => Some(4),
+        "yellow" => Some(5),
+        "red" => Some(6),
+        "orange" => Some(7),
+        _ => None,
+    }
+}
+
+/// Sets the macOS colour label on `path`, replacing any existing colour label.
+///
+/// Finder stores a colour label as a tag of the form `"Name\nIndex"`. We drop
+/// any existing system-colour tag first so a file has at most one colour, then
+/// add the new one. An empty/`"none"` colour just clears the label.
+fn set_color_label(path: &Path, color: &str) -> Result<()> {
+    let mut tags = read_file_tags(path);
+
+    // Remove any existing colour-label tag (a tag whose name is a system colour).
+    tags.retain(|t| {
+        let name = t.split('\n').next().unwrap_or(t).trim();
+        color_index(name).is_none()
+    });
+
+    if let Some(idx) = color_index(color) {
+        tags.push(format!("{}\n{}", capitalize(color), idx));
+    }
+
+    write_file_tags(path, &tags)
+}
+
+fn capitalize(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase(),
+        None => String::new(),
+    }
 }

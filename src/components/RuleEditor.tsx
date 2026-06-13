@@ -46,6 +46,8 @@ const KIND_OPTIONS: { value: string; label: string }[] = [
 // The 7 macOS system color labels, in Finder order.
 const COLOR_LABELS = ["Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Gray"];
 
+const SIZE_UNITS = ["bytes", "KB", "MB", "GB"] as const;
+
 function operatorsFor(kind: ConditionKind): Operator[] {
   if (kind === "size_bytes") return NUMBER_OPERATORS;
   if (kind === "kind" || kind === "color_label") return PRESENCE_OPERATORS;
@@ -277,15 +279,10 @@ function ConditionRow({
             );
           })}
         </div>
+      ) : condition.kind === "tags" ? (
+        <TagPicker value={condition.value} onChange={(v) => onChange({ value: v })} />
       ) : condition.kind === "size_bytes" ? (
-        <input
-          className="condition-value"
-          type="number"
-          min={0}
-          value={condition.value}
-          placeholder="bytes"
-          onChange={(e) => onChange({ value: e.target.value })}
-        />
+        <SizeValue value={condition.value} onChange={(v) => onChange({ value: v })} />
       ) : (
         <input
           className="condition-value"
@@ -298,6 +295,44 @@ function ConditionRow({
       <button className="row-remove" onClick={onRemove}>
         <Minus size={12} />
       </button>
+    </div>
+  );
+}
+
+// ---------- Size value (number + unit) ----------
+
+function SizeValue({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  // Stored as "<number> <unit>" (e.g. "5 MB"); plain numbers are treated as bytes.
+  const match = value.trim().match(/^([\d.]*)\s*(bytes|kb|mb|gb)?$/i);
+  const num = match?.[1] ?? "";
+  const rawUnit = match?.[2]?.toLowerCase();
+  const unit = SIZE_UNITS.find((u) => u.toLowerCase() === rawUnit) ?? "bytes";
+
+  const emit = (n: string, u: string) => onChange(n ? `${n} ${u}` : "");
+
+  return (
+    <div className="size-value">
+      <input
+        className="condition-value"
+        type="number"
+        min={0}
+        value={num}
+        placeholder="0"
+        onChange={(e) => emit(e.target.value, unit)}
+      />
+      <select value={unit} onChange={(e) => emit(num, e.target.value)}>
+        {SIZE_UNITS.map((u) => (
+          <option key={u} value={u}>
+            {u}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -317,6 +352,7 @@ function ActionRow({
     action.kind === "move_to_folder" || action.kind === "copy_to_folder";
   const needsPattern = action.kind === "rename";
   const needsTag = action.kind === "add_tag" || action.kind === "remove_tag";
+  const needsColorLabel = action.kind === "set_color_label";
   const needsScript = action.kind === "run_script";
 
   const pickFolder = async () => {
@@ -365,10 +401,34 @@ function ActionRow({
       )}
 
       {needsTag && (
-        <MacTagPicker
+        <TagPicker
           value={action.params.tag ?? ""}
           onChange={(tag) => onChange({ params: { ...action.params, tag } })}
         />
+      )}
+
+      {needsColorLabel && (
+        <div className="tag-picker">
+          {COLOR_LABELS.map((label) => {
+            const selected = action.params.color === label;
+            return (
+              <button
+                key={label}
+                type="button"
+                className={`tag-dot${selected ? " tag-dot--active" : ""}`}
+                style={{ backgroundColor: MACOS_TAG_COLORS[label] }}
+                title={label}
+                onClick={() =>
+                  onChange({
+                    params: { ...action.params, color: selected ? "" : label },
+                  })
+                }
+              >
+                {selected && <Check size={9} color="#fff" strokeWidth={3} />}
+              </button>
+            );
+          })}
+        </div>
       )}
 
       {needsScript && (
@@ -389,7 +449,7 @@ function ActionRow({
   );
 }
 
-// ---------- macOS tag picker ----------
+// ---------- Color dot map (used by color-label pickers) ----------
 
 const MACOS_TAG_COLORS: Record<string, string> = {
   Red: "#FF3B30",
@@ -401,26 +461,29 @@ const MACOS_TAG_COLORS: Record<string, string> = {
   Gray: "#8E8E93",
 };
 
-function MacTagPicker({
+// ---------- Text tag picker ----------
+//
+// Tags are free-form text labels, distinct from the colored Finder labels
+// (handled separately by the color-label picker). The 7 system color names
+// are filtered out here so they only appear as color labels, not as tags.
+
+function TagPicker({
   value,
   onChange,
 }: {
   value: string;
   onChange: (tag: string) => void;
 }) {
-  const [allTags, setAllTags] = useState<string[]>(Object.keys(MACOS_TAG_COLORS));
+  const [tags, setTags] = useState<string[]>([]);
   const [customInput, setCustomInput] = useState("");
 
   const loadTags = () => {
     invoke<string[]>("get_macos_tags")
-      .then(setAllTags)
+      .then(setTags)
       .catch(() => {});
   };
 
   useEffect(loadTags, []);
-
-  const systemTags = Object.keys(MACOS_TAG_COLORS);
-  const userTags = allTags.filter((t) => !systemTags.includes(t));
 
   const applyCustom = async () => {
     const tag = customInput.trim();
@@ -433,30 +496,12 @@ function MacTagPicker({
 
   return (
     <div className="tag-picker-wrap">
-      {/* System color dots */}
-      <div className="tag-picker">
-        {systemTags.map((tag) => {
-          const selected = value === tag;
-          return (
-            <button
-              key={tag}
-              className={`tag-dot${selected ? " tag-dot--active" : ""}`}
-              style={{ backgroundColor: MACOS_TAG_COLORS[tag] }}
-              title={tag}
-              onClick={() => onChange(selected ? "" : tag)}
-            >
-              {selected && <Check size={9} color="#fff" strokeWidth={3} />}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* User-defined Finder tags */}
-      {userTags.length > 0 && (
+      {tags.length > 0 && (
         <div className="tag-user-list">
-          {userTags.map((tag) => (
+          {tags.map((tag) => (
             <button
               key={tag}
+              type="button"
               className={`tag-user-pill${value === tag ? " tag-user-pill--active" : ""}`}
               onClick={() => onChange(value === tag ? "" : tag)}
             >
@@ -466,17 +511,17 @@ function MacTagPicker({
         </div>
       )}
 
-      {/* Custom tag input */}
       <div className="tag-custom-input-row">
         <input
           className="tag-custom-input"
           value={customInput}
-          placeholder="Custom tag…"
+          placeholder="Add a tag…"
           onChange={(e) => setCustomInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && applyCustom()}
         />
         <button
           className="btn btn-secondary btn-sm"
+          type="button"
           onClick={applyCustom}
           disabled={!customInput.trim()}
         >
@@ -484,11 +529,10 @@ function MacTagPicker({
         </button>
       </div>
 
-      {/* Show selected custom tag (not in any known list) */}
-      {value && !systemTags.includes(value) && !userTags.includes(value) && (
+      {value && !tags.includes(value) && (
         <div className="tag-custom-selected">
           <span className="tag-custom-label">{value}</span>
-          <button className="tag-custom-clear" onClick={() => onChange("")}>
+          <button type="button" className="tag-custom-clear" onClick={() => onChange("")}>
             <X size={10} />
           </button>
         </div>
