@@ -91,17 +91,6 @@ pub struct Condition {
     pub value: String,
 }
 
-impl Condition {
-    pub fn new(rule_id: String, kind: ConditionKind, operator: Operator, value: String) -> Self {
-        Self {
-            id: Uuid::new_v4().to_string(),
-            rule_id,
-            kind,
-            operator,
-            value,
-        }
-    }
-}
 
 // ---------- Actions ----------
 
@@ -131,19 +120,3 @@ pub struct Action {
     pub position: i64,
 }
 
-impl Action {
-    pub fn new(
-        rule_id: String,
-        kind: ActionKind,
-        params: serde_json::Value,
-        position: i64,
-    ) -> Self {
-        Self {
-            id: Uuid::new_v4().to_string(),
-            rule_id,
-            kind,
-            params,
-            position,
-        }
-    }
-}

@@ -15,7 +15,6 @@ use crate::rules::{engine, model::Rule};
 pub enum WatcherCmd {
     Add(PathBuf),
     Remove(PathBuf),
-    Shutdown,
 }
 
 pub struct WatcherHandle {
@@ -51,7 +50,6 @@ pub fn start(db: Arc<Mutex<Connection>>, _app: AppHandle) -> Result<WatcherHandl
                         let _ = watcher.unwatch(&path);
                         watched.remove(&path);
                     }
-                    Ok(WatcherCmd::Shutdown) => break,
                     Err(_) => {}
                 }
 
