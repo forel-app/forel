@@ -1,6 +1,6 @@
 name: Release
 
-# Publishes a universal (Intel + Apple Silicon) .dmg to a GitHub Release
+# Publishes two .dmg files (Intel + Apple Silicon) to a GitHub Release
 # whenever a version tag is pushed, e.g.:
 #   git tag v0.1.0 && git push origin v0.1.0
 
@@ -13,10 +13,17 @@ permissions:
   contents: write # required to create the release and upload assets
 
 jobs:
-  release:
-    # macOS arm64 runner with full Xcode — builds the universal binary
-    # (CGO cross-compiles amd64 + arm64, then lipo) and creates the .dmg.
-    runs-on: macos-14
+  build:
+    strategy:
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-14
+            suffix: apple-silicon
+          - arch: amd64
+            runner: macos-13
+            suffix: intel
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,30 +51,38 @@ jobs:
           go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha.98
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
-      - name: Install frontend deps (frozen lockfile)
-        run: pnpm install --frozen-lockfile
-        working-directory: frontend
+      - name: Build .app (${{ matrix.arch }})
+        run: wails3 task package
+        env:
+          ARCH: ${{ matrix.arch }}
 
-      - name: Build universal .dmg
-        run: wails3 task dmg
-
-      - name: Name the artifact after the tag
-        run: mv bin/Forel.dmg "bin/Forel-${GITHUB_REF_NAME}-universal.dmg"
+      - name: Create .dmg (${{ matrix.arch }})
+        run: |
+          STAGING="$(mktemp -d)"
+          cp -R bin/Forel.app "$STAGING/"
+          ln -s /Applications "$STAGING/Applications"
+          hdiutil create \
+            -volname "Forel" \
+            -srcfolder "$STAGING" \
+            -ov -format UDZO \
+            "bin/Forel-${GITHUB_REF_NAME}-${{ matrix.suffix }}.dmg"
+          rm -rf "$STAGING"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: bin/Forel-*-universal.dmg
+          files: bin/Forel-*-${{ matrix.suffix }}.dmg
           generate_release_notes: true
-          # Tags with a pre-release suffix (e.g. v0.1.0-alpha) are flagged as pre-releases.
           prerelease: ${{ contains(github.ref_name, '-') }}
           body: |
             ## Forel ${{ github.ref_name }}
 
-            Universal build for **Intel & Apple Silicon** macOS (14 Sonoma or later).
+            Two builds available — download the one that matches your Mac:
+            - `Forel-${{ github.ref_name }}-apple-silicon.dmg` → M1 / M2 / M3 / M4
+            - `Forel-${{ github.ref_name }}-intel.dmg` → Intel (x86_64)
 
             ### Install
-            1. Download `Forel-${{ github.ref_name }}-universal.dmg` below.
+            1. Download the correct .dmg for your Mac.
             2. Open it and drag **Forel** into **Applications**.
             3. First launch: the app is ad-hoc signed (not notarized), so right-click
                **Forel.app → Open** and confirm. (Or run `xattr -cr /Applications/Forel.app`.)
