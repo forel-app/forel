@@ -1,7 +1,6 @@
 package tray
 
 import (
-	"path/filepath"
 	"sync/atomic"
 
 	"forel/internal/db"
@@ -70,43 +69,19 @@ func (c *Controller) buildMenu() *application.Menu {
 	menu.AddSeparator()
 
 	paused := c.paused.Load()
-	statusLabel, actionLabel := "🟢  File watching is active", "Stop Watching"
+	statusLabel, actionLabel := "File watching is active", "Stop Watching"
+	dot := DotGreen
 	if paused {
-		statusLabel, actionLabel = "🔴  File watching is paused", "Start Watching"
+		statusLabel, actionLabel = "File watching is paused", "Start Watching"
+		dot = DotRed
 	}
 
 	status := menu.Add(statusLabel)
 	status.SetEnabled(false)
+	if dot != nil {
+		status.SetBitmap(dot)
+	}
 	menu.Add(actionLabel).OnClick(func(*application.Context) { c.toggleWatch() })
-	menu.AddSeparator()
-
-	// Rules grouped by folder.
-	hasRules := false
-	if groups, err := c.store.ListAllRulesWithFolder(); err == nil {
-		for _, group := range groups {
-			if len(group.Rules) == 0 {
-				continue
-			}
-			folderName := filepath.Base(group.Folder.Path)
-			if folderName == "" || folderName == "." {
-				folderName = group.Folder.Path
-			}
-			header := menu.Add(folderName)
-			header.SetEnabled(false)
-
-			for _, rule := range group.Rules {
-				hasRules = true
-				ruleID := rule.ID
-				item := menu.AddCheckbox(rule.Name, rule.Enabled)
-				item.OnClick(func(*application.Context) { c.toggleRule(ruleID) })
-			}
-		}
-	}
-
-	if !hasRules {
-		noRules := menu.Add("No rules configured")
-		noRules.SetEnabled(false)
-	}
 
 	menu.AddSeparator()
 	menu.Add("Quit Forel").OnClick(func(*application.Context) { c.app.Quit() })
@@ -131,14 +106,4 @@ func (c *Controller) toggleWatch() {
 		}
 	}
 	c.Rebuild()
-}
-
-func (c *Controller) toggleRule(ruleID string) {
-	enabled, ok := c.store.RuleEnabled(ruleID)
-	if !ok {
-		return
-	}
-	if err := c.store.ToggleRule(ruleID, !enabled); err == nil {
-		c.Rebuild()
-	}
 }

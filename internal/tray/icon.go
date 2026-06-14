@@ -3,8 +3,10 @@ package tray
 import (
 	"bytes"
 	"image"
+	"image/color"
 	"image/draw"
 	"image/png"
+	"math"
 )
 
 // trayMarginRatio gives breathing room around the content, as a fraction of its
@@ -74,3 +76,50 @@ func processIcon(src []byte) []byte {
 	}
 	return buf.Bytes()
 }
+
+// dotPNG returns a filled circle PNG with sub-pixel antialiasing.
+// size should be 28–32 for crisp Retina rendering at menu-item icon size.
+func dotPNG(size int, c color.RGBA) []byte {
+	img := image.NewRGBA(image.Rect(0, 0, size, size))
+	cx, cy := float64(size)/2, float64(size)/2
+	r := float64(size)/2 - 1.0
+
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			// Sample 4×4 sub-pixels for antialiasing
+			var coverage float64
+			for sy := 0; sy < 4; sy++ {
+				for sx := 0; sx < 4; sx++ {
+					px := float64(x) + (float64(sx)+0.5)/4.0
+					py := float64(y) + (float64(sy)+0.5)/4.0
+					dx := px - cx
+					dy := py - cy
+					if math.Sqrt(dx*dx+dy*dy) <= r {
+						coverage += 1.0 / 16.0
+					}
+				}
+			}
+			if coverage > 0 {
+				img.SetRGBA(x, y, color.RGBA{
+					R: c.R,
+					G: c.G,
+					B: c.B,
+					A: uint8(float64(c.A) * coverage),
+				})
+			}
+		}
+	}
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		return nil
+	}
+	return buf.Bytes()
+}
+
+var (
+	// DotGreen and DotRed are pre-rendered status dots for menu items.
+	// 16×16 matches the standard macOS menu-item icon size.
+	DotGreen = dotPNG(13, color.RGBA{52, 199, 89, 255})
+	DotRed   = dotPNG(13, color.RGBA{255, 59, 48, 255})
+)
