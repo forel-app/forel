@@ -39,6 +39,18 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Install frontend deps (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+        working-directory: frontend
+
+      - name: Lint frontend
+        run: pnpm lint
+        working-directory: frontend
+
+      - name: Build frontend (tsc + vite)
+        run: pnpm build
+        working-directory: frontend
+
       - name: Check formatting (gofmt)
         run: |
           unformatted="$(gofmt -l .)"
@@ -53,15 +65,3 @@ jobs:
 
       - name: Test
         run: go test ./internal/...
-
-      - name: Install frontend deps (frozen lockfile)
-        run: pnpm install --frozen-lockfile
-        working-directory: frontend
-
-      - name: Lint frontend
-        run: pnpm lint
-        working-directory: frontend
-
-      - name: Build frontend (tsc + vite)
-        run: pnpm build
-        working-directory: frontend
