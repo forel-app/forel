@@ -67,11 +67,37 @@ function operatorsFor(kind: ConditionKind): Operator[] {
 }
 
 export default function RuleEditor({ rule, onClose }: Props) {
-  const { updateRule } = useForelStore();
+  const { updateRule, runRule, rules } = useForelStore();
   const [draft, setDraft] = useState<Rule>(structuredClone(rule));
+  const [error, setError] = useState<string | null>(null);
 
   const save = async () => {
+    // A file can only carry one color label, so reject conflicting setups:
+    // more than one color-label action in this rule, or another rule in the
+    // same folder that also sets a color label.
+    const colorActions = draft.actions.filter((a) => a.kind === "set_color_label");
+    if (colorActions.length > 1) {
+      setError("A rule can set only one color label.");
+      return;
+    }
+    if (
+      colorActions.length === 1 &&
+      rules.some(
+        (r) =>
+          r.id !== draft.id &&
+          r.actions.some((a) => a.kind === "set_color_label"),
+      )
+    ) {
+      setError(
+        "Another rule in this folder already sets a color label — a file can only have one.",
+      );
+      return;
+    }
+
+    setError(null);
     await updateRule(draft);
+    // Saving an enabled rule re-applies it to all existing files in the folder.
+    if (draft.enabled) await runRule(draft.id);
     onClose();
   };
 
@@ -177,7 +203,7 @@ export default function RuleEditor({ rule, onClose }: Props) {
           ))}
 
           {draft.conditions.length === 0 && (
-            <p className="editor-empty">No conditions — rule will never match.</p>
+            <p className="editor-empty">No conditions — rule matches every file in the folder.</p>
           )}
         </section>
 
@@ -205,12 +231,23 @@ export default function RuleEditor({ rule, onClose }: Props) {
         </section>
 
         <div className="editor-footer">
-          <button className="btn btn-secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn btn-primary" onClick={save}>
-            Save
-          </button>
+          {error ? (
+            <p className="editor-error">⚠️ {error}</p>
+          ) : (
+            <p className="editor-warning">
+              {draft.enabled
+                ? "⚠️ This rule is active — saving runs it now on every existing file in the folder."
+                : "This rule is inactive. Enable it (toggle in the list) to apply it to the folder."}
+            </p>
+          )}
+          <div className="editor-footer-actions">
+            <button className="btn btn-secondary" onClick={onClose}>
+              Cancel
+            </button>
+            <button className="btn btn-primary" onClick={save}>
+              Save
+            </button>
+          </div>
         </div>
       </div>
     </div>

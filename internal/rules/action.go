@@ -208,6 +208,57 @@ func applyRenamePattern(pattern, path string) (string, error) {
 	return result + "." + ext, nil
 }
 
+// WouldChange reports whether executing the action on path would actually alter
+// the file's state. Preview uses it to hide actions that are already applied
+// (no-ops), so an already-processed folder previews as empty. Filesystem-moving
+// actions (move/copy/trash/delete) and scripts always count as a change.
+func WouldChange(action Action, path string) bool {
+	switch action.Kind {
+	case ActSetColorLabel:
+		target := strings.ToLower(paramString(action.Params, "color"))
+		return currentColorName(path) != target
+	case ActAddTag:
+		existing := ReadFileTags(path)
+		for _, tag := range paramStrings(action.Params, "tags") {
+			if !contains(existing, tag) {
+				return true
+			}
+		}
+		return false
+	case ActRemoveTag:
+		existing := ReadFileTags(path)
+		for _, tag := range paramStrings(action.Params, "tags") {
+			if contains(existing, tag) {
+				return true
+			}
+		}
+		return false
+	case ActRename:
+		newName, err := applyRenamePattern(paramString(action.Params, "pattern"), path)
+		if err != nil {
+			return true
+		}
+		return newName != filepath.Base(path)
+	default:
+		return true
+	}
+}
+
+// currentColorName returns the lower-cased system-colour label on path, or "".
+func currentColorName(path string) string {
+	for _, t := range ReadFileTags(path) {
+		name := t
+		if i := strings.IndexByte(t, '\n'); i >= 0 {
+			name = t[:i]
+		}
+		name = strings.TrimSpace(name)
+		if _, ok := colorIndex(name); ok {
+			return strings.ToLower(name)
+		}
+	}
+	return ""
+}
+
 // ---------- macOS Finder tags via xattr ----------
 
 const tagsXattr = "com.apple.metadata:_kMDItemUserTags"

@@ -74,6 +74,17 @@ export function RemoveWatchedFolder(id: string): $CancellablePromise<void> {
 }
 
 /**
+ * RunRule applies a single rule to every file in its folder. It's how a rule is
+ * "applied" on demand — when an enabled rule is saved or toggled on. A disabled
+ * or missing rule is a no-op.
+ */
+export function RunRule(ruleID: string): $CancellablePromise<string[]> {
+    return $Call.ByID(2122344756, ruleID).then(($result: any) => {
+        return $$createType2($result);
+    });
+}
+
+/**
  * RunRulesNow evaluates and applies all rules to every file in the folder.
  */
 export function RunRulesNow(folderID: string): $CancellablePromise<string[]> {

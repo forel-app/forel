@@ -57,7 +57,15 @@ func PreviewFile(path string, rules []Rule) *FilePreview {
 		sorted := sortedActions(rule)
 		actions := make([]string, 0, len(sorted))
 		for _, act := range sorted {
+			// Hide actions already applied — preview shows only what's left to do.
+			if !WouldChange(act, path) {
+				continue
+			}
 			actions = append(actions, Preview(act, path))
+		}
+		// Every action is already applied: nothing to preview for this rule.
+		if len(actions) == 0 {
+			continue
 		}
 		matchedRules = append(matchedRules, RulePreview{
 			RuleID:   rule.ID,
@@ -78,8 +86,9 @@ func PreviewFile(path string, rules []Rule) *FilePreview {
 }
 
 func ruleMatches(rule Rule, path string) bool {
+	// A rule with no conditions matches every file in the folder.
 	if len(rule.Conditions) == 0 {
-		return false
+		return true
 	}
 
 	switch rule.ConditionMatch {

@@ -133,6 +133,12 @@ func (s *Store) FolderPath(id string) (string, error) {
 	return path, err
 }
 
+func (s *Store) RuleFolderID(ruleID string) (string, error) {
+	var folderID string
+	err := s.db.QueryRow("SELECT folder_id FROM rules WHERE id=?", ruleID).Scan(&folderID)
+	return folderID, err
+}
+
 // FolderIDForPath returns the id of the enabled watched folder whose path
 // equals path, or ("", false) if none.
 func (s *Store) FolderIDForPath(path string) (string, bool) {

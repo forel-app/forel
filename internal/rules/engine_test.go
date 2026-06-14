@@ -31,13 +31,34 @@ func TestEvaluateFileMatchesEnabledRules(t *testing.T) {
 		mkRule("disabled", false, MatchAll, []Condition{
 			cond(CondExtension, OpIs, "pdf"),
 		}),
+		// A rule with no conditions matches every file.
 		mkRule("empty", true, MatchAll, nil),
 	}
 
 	got := EvaluateFile(file, rs)
-	want := []string{"all matched", "any matched"}
-	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+	want := []string{"all matched", "any matched", "empty"}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
 		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestPreviewFileHidesAlreadyAppliedActions(t *testing.T) {
+	file := tempFile(t, "photo.jpg", "img")
+	rule := mkRule("label jpgs", true, MatchAll, []Condition{cond(CondExtension, OpIs, "jpg")})
+	rule.Actions = []Action{
+		{Kind: ActSetColorLabel, Params: map[string]any{"color": "Yellow"}, Position: 1},
+		{Kind: ActAddTag, Params: map[string]any{"tags": []any{"Sorted"}}, Position: 2},
+	}
+
+	// Before applying: preview lists both actions.
+	if p := PreviewFile(file, []Rule{rule}); p == nil || len(p.Rules[0].Actions) != 2 {
+		t.Fatalf("expected 2 actions before applying, got %+v", p)
+	}
+
+	// Apply the rule, then preview must be empty — both actions are now no-ops.
+	EvaluateFile(file, []Rule{rule})
+	if p := PreviewFile(file, []Rule{rule}); p != nil {
+		t.Fatalf("expected empty preview after applying, got %+v", p)
 	}
 }
 

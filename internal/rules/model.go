@@ -110,10 +110,12 @@ type Rule struct {
 
 func NewRule(folderID, name string) Rule {
 	return Rule{
-		ID:             uuid.NewString(),
-		FolderID:       folderID,
-		Name:           name,
-		Enabled:        true,
+		ID:       uuid.NewString(),
+		FolderID: folderID,
+		Name:     name,
+		// New rules start disabled so the user can configure conditions and
+		// actions before enabling — enabling is what applies the rule.
+		Enabled:        false,
 		ConditionMatch: MatchAll,
 		Conditions:     []Condition{},
 		Actions:        []Action{},

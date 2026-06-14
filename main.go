@@ -90,7 +90,6 @@ func main() {
 	}
 }
 
-// databasePath mirrors the original Tauri data dir so existing rules survive:
 // ~/Library/Application Support/com.forel.app/forel.db.
 func databasePath() string {
 	home, err := os.UserHomeDir()

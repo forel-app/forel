@@ -5,7 +5,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   // Ignore built output
-  { ignores: ["dist", "src-tauri"] },
+  { ignores: ["dist"] },
 
   // Base JS recommended rules
   js.configs.recommended,
@@ -41,7 +41,7 @@ export default tseslint.config(
     rules: {
       // tsc already enforces these; avoid double-reporting
       "@typescript-eslint/no-unused-vars": "off",
-      // Allow type assertions where needed (e.g. Tauri invoke generics)
+      // Allow type assertions where needed (e.g. invoke generics)
       "@typescript-eslint/consistent-type-assertions": ["error", { assertionStyle: "as" }],
       // Require explicit return types on exported functions
       "@typescript-eslint/explicit-module-boundary-types": "off",

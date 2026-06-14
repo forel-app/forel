@@ -8,6 +8,7 @@ import {
   GetWatchedFolders,
   PreviewRules,
   RemoveWatchedFolder,
+  RunRule,
   RunRulesNow,
   ToggleRule,
   ToggleWatchedFolder,
@@ -37,6 +38,7 @@ interface ForelState {
   updateRule: (rule: Rule) => Promise<void>;
   deleteRule: (ruleId: string) => Promise<void>;
   toggleRule: (ruleId: string, enabled: boolean) => Promise<void>;
+  runRule: (ruleId: string) => Promise<string[]>;
   runRulesNow: (folderId: string) => Promise<string[]>;
   previewRules: (folderId: string) => Promise<PreviewResult>;
 }
@@ -111,6 +113,12 @@ export const useForelStore = create<ForelState>((set, get) => ({
     set((s) => ({
       rules: s.rules.map((r) => (r.id === ruleId ? { ...r, enabled } : r)),
     }));
+    // Enabling a rule applies it to the existing files in the folder.
+    if (enabled) await RunRule(ruleId);
+  },
+
+  runRule: async (ruleId) => {
+    return RunRule(ruleId);
   },
 
   runRulesNow: async (folderId) => {

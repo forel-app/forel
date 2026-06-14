@@ -135,6 +135,45 @@ func (a *App) RunRulesNow(folderID string) ([]string, error) {
 	return matched, nil
 }
 
+// RunRule applies a single rule to every file in its folder. It's how a rule is
+// "applied" on demand — when an enabled rule is saved or toggled on. A disabled
+// or missing rule is a no-op.
+func (a *App) RunRule(ruleID string) ([]string, error) {
+	folderID, err := a.store.RuleFolderID(ruleID)
+	if err != nil {
+		return nil, err
+	}
+	folderPath, err := a.store.FolderPath(folderID)
+	if err != nil {
+		return nil, err
+	}
+	folderRules, err := a.store.ListRules(folderID)
+	if err != nil {
+		return nil, err
+	}
+
+	var target *rules.Rule
+	for i := range folderRules {
+		if folderRules[i].ID == ruleID {
+			target = &folderRules[i]
+			break
+		}
+	}
+	if target == nil || !target.Enabled {
+		return []string{}, nil
+	}
+
+	matched := make([]string, 0)
+	entries, err := os.ReadDir(folderPath)
+	if err == nil {
+		for _, entry := range entries {
+			p := filepath.Join(folderPath, entry.Name())
+			matched = append(matched, rules.EvaluateFile(p, []rules.Rule{*target})...)
+		}
+	}
+	return matched, nil
+}
+
 // PreviewRules simulates rule evaluation over the folder without running actions.
 func (a *App) PreviewRules(folderID string) (rules.PreviewResult, error) {
 	folderPath, rs, err := a.folderRules(folderID)
