@@ -15,6 +15,10 @@ import { Call as $Call, CancellablePromise as $CancellablePromise, Create as $Cr
 // @ts-ignore: Unused imports
 import * as rules$0 from "./internal/rules/models.js";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
 /**
  * AddCustomTag persists a user-defined tag so it appears across sessions.
  */
@@ -28,9 +32,18 @@ export function AddWatchedFolder(path: string): $CancellablePromise<rules$0.Watc
     });
 }
 
+/**
+ * CheckForUpdates uses the Wails updater to query GitHub Releases.
+ */
+export function CheckForUpdates(): $CancellablePromise<$models.UpdateInfo> {
+    return $Call.ByID(2675659504).then(($result: any) => {
+        return $$createType1($result);
+    });
+}
+
 export function CreateRule(folderID: string, name: string): $CancellablePromise<rules$0.Rule> {
     return $Call.ByID(487083315, folderID, name).then(($result: any) => {
-        return $$createType1($result);
+        return $$createType2($result);
     });
 }
 
@@ -44,19 +57,19 @@ export function DeleteRule(ruleID: string): $CancellablePromise<void> {
  */
 export function GetMacosTags(): $CancellablePromise<string[]> {
     return $Call.ByID(61451397).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType3($result);
     });
 }
 
 export function GetRules(folderID: string): $CancellablePromise<rules$0.Rule[]> {
     return $Call.ByID(2351437958, folderID).then(($result: any) => {
-        return $$createType3($result);
+        return $$createType4($result);
     });
 }
 
 export function GetWatchedFolders(): $CancellablePromise<rules$0.WatchedFolder[]> {
     return $Call.ByID(862549760).then(($result: any) => {
-        return $$createType4($result);
+        return $$createType5($result);
     });
 }
 
@@ -65,7 +78,7 @@ export function GetWatchedFolders(): $CancellablePromise<rules$0.WatchedFolder[]
  */
 export function PreviewRules(folderID: string): $CancellablePromise<rules$0.PreviewResult> {
     return $Call.ByID(423622998, folderID).then(($result: any) => {
-        return $$createType5($result);
+        return $$createType6($result);
     });
 }
 
@@ -80,7 +93,7 @@ export function RemoveWatchedFolder(id: string): $CancellablePromise<void> {
  */
 export function RunRule(ruleID: string): $CancellablePromise<string[]> {
     return $Call.ByID(2122344756, ruleID).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType3($result);
     });
 }
 
@@ -89,7 +102,7 @@ export function RunRule(ruleID: string): $CancellablePromise<string[]> {
  */
 export function RunRulesNow(folderID: string): $CancellablePromise<string[]> {
     return $Call.ByID(2301641879, folderID).then(($result: any) => {
-        return $$createType2($result);
+        return $$createType3($result);
     });
 }
 
@@ -115,8 +128,9 @@ export function UpdateRule(rule: rules$0.Rule): $CancellablePromise<void> {
 
 // Private type creation functions
 const $$createType0 = rules$0.WatchedFolder.createFrom;
-const $$createType1 = rules$0.Rule.createFrom;
-const $$createType2 = $Create.Array($Create.Any);
-const $$createType3 = $Create.Array($$createType1);
-const $$createType4 = $Create.Array($$createType0);
-const $$createType5 = rules$0.PreviewResult.createFrom;
+const $$createType1 = $models.UpdateInfo.createFrom;
+const $$createType2 = rules$0.Rule.createFrom;
+const $$createType3 = $Create.Array($Create.Any);
+const $$createType4 = $Create.Array($$createType2);
+const $$createType5 = $Create.Array($$createType0);
+const $$createType6 = rules$0.PreviewResult.createFrom;

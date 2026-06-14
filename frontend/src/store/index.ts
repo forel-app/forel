@@ -1,7 +1,8 @@
 import { create } from "zustand";
-import { PreviewResult, Rule, WatchedFolder } from "../types";
+import { PreviewResult, Rule, UpdateInfo, UpdateStatus, WatchedFolder } from "../types";
 import {
   AddWatchedFolder,
+  CheckForUpdates,
   CreateRule,
   DeleteRule,
   GetRules,
@@ -25,6 +26,10 @@ interface ForelState {
   rules: Rule[];
   loading: boolean;
 
+  // Update state
+  updateStatus: UpdateStatus;
+  updateInfo: UpdateInfo | null;
+
   // Folder actions
   fetchFolders: () => Promise<void>;
   addFolder: (path: string) => Promise<void>;
@@ -41,6 +46,9 @@ interface ForelState {
   runRule: (ruleId: string) => Promise<string[]>;
   runRulesNow: (folderId: string) => Promise<string[]>;
   previewRules: (folderId: string) => Promise<PreviewResult>;
+
+  // Update actions
+  checkForUpdates: () => Promise<void>;
 }
 
 export const useForelStore = create<ForelState>((set, get) => ({
@@ -48,6 +56,8 @@ export const useForelStore = create<ForelState>((set, get) => ({
   selectedFolderId: null,
   rules: [],
   loading: false,
+  updateStatus: "idle",
+  updateInfo: null,
 
   fetchFolders: async () => {
     const folders = (await GetWatchedFolders()) as unknown as WatchedFolder[];
@@ -127,5 +137,18 @@ export const useForelStore = create<ForelState>((set, get) => ({
 
   previewRules: async (folderId) => {
     return PreviewRules(folderId);
+  },
+
+  checkForUpdates: async () => {
+    set({ updateStatus: "checking", updateInfo: null });
+    try {
+      const info = (await CheckForUpdates()) as unknown as UpdateInfo;
+      set({
+        updateStatus: info.has_update ? "available" : "up-to-date",
+        updateInfo: info,
+      });
+    } catch {
+      set({ updateStatus: "error", updateInfo: null });
+    }
   },
 }));

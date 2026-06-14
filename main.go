@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync/atomic"
+	"time"
 
 	"forel/internal/db"
 	"forel/internal/tray"
@@ -13,6 +14,8 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
+	"github.com/wailsapp/wails/v3/pkg/updater"
+	githubprovider "github.com/wailsapp/wails/v3/pkg/updater/providers/github"
 )
 
 //go:embed all:frontend/dist
@@ -49,6 +52,23 @@ func main() {
 		},
 	})
 	appSvc.app = app
+
+	// Initialise the Wails updater with the GitHub releases provider.
+	// Prereleases are included since Forel is currently in alpha.
+	ghProvider, err := githubprovider.New(githubprovider.Config{
+		Repository: "lguichard/forel",
+		Prerelease: true,
+	})
+	if err != nil {
+		log.Fatalf("configure updater: %v", err)
+	}
+	if err := app.Updater.Init(updater.Config{
+		CurrentVersion: AppVersion,
+		Providers:      []updater.Provider{ghProvider},
+		CheckInterval:  24 * time.Hour,
+	}); err != nil {
+		log.Printf("updater init: %v", err)
+	}
 
 	win := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:     "Forel",

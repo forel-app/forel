@@ -84,6 +84,14 @@ func (c *Controller) buildMenu() *application.Menu {
 	menu.Add(actionLabel).OnClick(func(*application.Context) { c.toggleWatch() })
 
 	menu.AddSeparator()
+	menu.Add("Check for Updates…").OnClick(func(*application.Context) {
+		c.win.Show()
+		c.win.Focus()
+		// Emit a custom event the frontend listens to in order to open Settings
+		// and trigger a check. The event name matches what the frontend expects.
+		c.app.Event.Emit("tray:check-updates")
+	})
+	menu.AddSeparator()
 	menu.Add("Quit Forel").OnClick(func(*application.Context) { c.app.Quit() })
 
 	return menu

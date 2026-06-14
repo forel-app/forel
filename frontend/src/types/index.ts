@@ -5,6 +5,16 @@ export interface WatchedFolder {
   created_at: string;
 }
 
+export interface UpdateInfo {
+  current_version: string;
+  latest_version: string;
+  has_update: boolean;
+  release_url: string;
+  release_name: string;
+}
+
+export type UpdateStatus = "idle" | "checking" | "up-to-date" | "available" | "error";
+
 export type ConditionMatch = "all" | "any";
 
 export type ConditionKind =

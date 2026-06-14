@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,6 +15,9 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
+
+// AppVersion is the current application version (no "v" prefix, matches release tags).
+const AppVersion = "0.1.0-alpha"
 
 // App is the service bound to the frontend. Each exported method becomes an
 // IPC-callable function in the generated TypeScript bindings.
@@ -266,4 +270,35 @@ func (a *App) SelectDirectory() (string, error) {
 	dialog.CanChooseDirectories(true)
 	dialog.CanChooseFiles(false)
 	return dialog.PromptForSingleSelection()
+}
+
+// ---------- Updates ----------
+
+// UpdateInfo is returned by CheckForUpdates.
+type UpdateInfo struct {
+	CurrentVersion string `json:"current_version"`
+	LatestVersion  string `json:"latest_version"`
+	HasUpdate      bool   `json:"has_update"`
+	ReleaseURL     string `json:"release_url"`
+	ReleaseName    string `json:"release_name"`
+}
+
+// CheckForUpdates uses the Wails updater to query GitHub Releases.
+func (a *App) CheckForUpdates() (UpdateInfo, error) {
+	info := UpdateInfo{CurrentVersion: AppVersion}
+	rel, err := a.app.Updater.Check(context.Background())
+	if err != nil {
+		return info, fmt.Errorf("check for updates: %w", err)
+	}
+	if rel == nil {
+		// nil means up to date
+		return info, nil
+	}
+	info.HasUpdate = true
+	info.LatestVersion = rel.Version
+	info.ReleaseName = rel.Name
+	if u, ok := rel.Metadata["github.release.htmlURL"].(string); ok {
+		info.ReleaseURL = u
+	}
+	return info, nil
 }

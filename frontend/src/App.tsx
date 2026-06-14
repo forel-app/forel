@@ -7,9 +7,11 @@ import { useForelStore } from "./store";
 import "./store/settings"; // applies the persisted theme on load
 import "./App.css";
 import forelIcon from "./assets/forel-icon.png";
+import { Events } from "@wailsio/runtime";
 
 export default function App() {
   const fetchFolders = useForelStore((s) => s.fetchFolders);
+  const checkForUpdates = useForelStore((s) => s.checkForUpdates);
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
@@ -27,6 +29,15 @@ export default function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Tray "Check for Updates…" → open Settings and trigger check.
+  useEffect(() => {
+    const off = Events.On("tray:check-updates", () => {
+      setShowSettings(true);
+      void checkForUpdates();
+    });
+    return () => off();
+  }, [checkForUpdates]);
 
   return (
     <div className="app">
