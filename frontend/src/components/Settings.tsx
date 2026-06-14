@@ -10,11 +10,9 @@ const THEME_OPTIONS: { value: Theme; label: string; icon: typeof Sun }[] = [
 
 export default function Settings({ onClose }: { onClose: () => void }) {
   const { theme, setTheme } = useSettings();
-  const { updateStatus, updateInfo, checkForUpdates } = useForelStore((s) => ({
-    updateStatus: s.updateStatus,
-    updateInfo: s.updateInfo,
-    checkForUpdates: s.checkForUpdates,
-  }));
+  const updateStatus = useForelStore((s) => s.updateStatus);
+  const updateInfo = useForelStore((s) => s.updateInfo);
+  const checkForUpdates = useForelStore((s) => s.checkForUpdates);
 
   // Triggered by the tray "Check for Updates…" item — handled in App.tsx.
 
