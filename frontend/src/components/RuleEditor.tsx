@@ -60,6 +60,49 @@ const KIND_OPTIONS: { value: string; label: string }[] = [
 
 const SIZE_UNITS = ["bytes", "KB", "MB", "GB"] as const;
 
+// Actions that remove a file from its current location — mutually exclusive.
+const TERMINAL_ACTION_KINDS: ActionKind[] = [
+  "move_to_folder",
+  "move_to_trash",
+  "delete",
+];
+
+function actionTags(actions: Action[], kind: ActionKind): Set<string> {
+  return new Set(
+    actions
+      .filter((a) => a.kind === kind)
+      .flatMap((a) => (Array.isArray(a.params.tags) ? (a.params.tags as string[]) : [])),
+  );
+}
+
+// Returns a human-readable error if the rule has a contradictory setup, else null.
+// `others` are the sibling rules in the same folder (to enforce folder-wide limits).
+function validateRule(rule: Rule, others: Rule[]): string | null {
+  const colorActions = rule.actions.filter((a) => a.kind === "set_color_label");
+  if (colorActions.length > 1) {
+    return "A rule can set only one color label.";
+  }
+  if (
+    colorActions.length === 1 &&
+    others.some((r) => r.actions.some((a) => a.kind === "set_color_label"))
+  ) {
+    return "Another rule in this folder already sets a color label — a file can only have one.";
+  }
+
+  if (rule.actions.filter((a) => TERMINAL_ACTION_KINDS.includes(a.kind)).length > 1) {
+    return "A rule can only move, trash, or delete a file once — these actions are mutually exclusive.";
+  }
+
+  const added = actionTags(rule.actions, "add_tag");
+  const removed = actionTags(rule.actions, "remove_tag");
+  const conflictTag = [...added].find((t) => removed.has(t));
+  if (conflictTag) {
+    return `Tag "${conflictTag}" is both added and removed by this rule.`;
+  }
+
+  return null;
+}
+
 function operatorsFor(kind: ConditionKind): Operator[] {
   if (kind === "size_bytes") return NUMBER_OPERATORS;
   if (kind === "kind" || kind === "color_label") return PRESENCE_OPERATORS;
@@ -72,25 +115,12 @@ export default function RuleEditor({ rule, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const save = async () => {
-    // A file can only carry one color label, so reject conflicting setups:
-    // more than one color-label action in this rule, or another rule in the
-    // same folder that also sets a color label.
-    const colorActions = draft.actions.filter((a) => a.kind === "set_color_label");
-    if (colorActions.length > 1) {
-      setError("A rule can set only one color label.");
-      return;
-    }
-    if (
-      colorActions.length === 1 &&
-      rules.some(
-        (r) =>
-          r.id !== draft.id &&
-          r.actions.some((a) => a.kind === "set_color_label"),
-      )
-    ) {
-      setError(
-        "Another rule in this folder already sets a color label — a file can only have one.",
-      );
+    const problem = validateRule(
+      draft,
+      rules.filter((r) => r.id !== draft.id),
+    );
+    if (problem) {
+      setError(problem);
       return;
     }
 

@@ -55,7 +55,7 @@ export const useForelStore = create<ForelState>((set, get) => ({
   },
 
   addFolder: async (path) => {
-    const folder = (await AddWatchedFolder(path)) as unknown as WatchedFolder;
+    const folder = await AddWatchedFolder(path);
     set((s) => ({ folders: [...s.folders, folder] }));
   },
 
@@ -126,6 +126,6 @@ export const useForelStore = create<ForelState>((set, get) => ({
   },
 
   previewRules: async (folderId) => {
-    return (await PreviewRules(folderId)) as unknown as PreviewResult;
+    return PreviewRules(folderId);
   },
 }));
