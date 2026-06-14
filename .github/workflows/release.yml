@@ -18,9 +18,9 @@ jobs:
       matrix:
         include:
           - arch: arm64
-            suffix: apple-silicon
+            suffix: darwin-arm64
           - arch: amd64
-            suffix: intel
+            suffix: darwin-x86_64
     # Both builds run on the arm64 runner (macos-14).
     # The amd64 build cross-compiles via GOARCH=amd64 + Xcode clang targeting x86_64.
     runs-on: macos-14
@@ -78,8 +78,8 @@ jobs:
             ## Forel ${{ github.ref_name }}
 
             Two builds available — download the one that matches your Mac:
-            - `Forel-${{ github.ref_name }}-apple-silicon.dmg` → M1 / M2 / M3 / M4
-            - `Forel-${{ github.ref_name }}-intel.dmg` → Intel (x86_64)
+            - `Forel-${{ github.ref_name }}-darwin-arm64.dmg` → Apple Silicon (M1 / M2 / M3 / M4)
+            - `Forel-${{ github.ref_name }}-darwin-x86_64.dmg` → Intel
 
             Requires **macOS 14 Sonoma or later**.
 
