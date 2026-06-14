@@ -6,6 +6,7 @@ import Sidebar from "./components/Sidebar";
 import { useForelStore } from "./store";
 import "./store/settings"; // applies the persisted theme on load
 import "./App.css";
+import forelIcon from "./assets/forel-icon.png";
 
 export default function App() {
   const fetchFolders = useForelStore((s) => s.fetchFolders);
@@ -31,7 +32,7 @@ export default function App() {
     <div className="app">
       <div className="titlebar">
         <div className="titlebar-brand">
-          <img className="titlebar-icon" src="/forel-icon.png" alt="" />
+          <img className="titlebar-icon" src={forelIcon} alt="" />
           <span className="titlebar-title">Forel</span>
         </div>
         <button

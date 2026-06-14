@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  <defs>
+    <!-- Punch out the gear shape (teeth + ring) and the center dot from the folder fill -->
+    <mask id="foldermask">
+      <rect width="24" height="24" fill="white"/>
+      <!-- Teeth cutouts -->
+      <rect x="11.15" y="9.2"  width="1.7" height="1.6" rx="0.3" fill="black" transform="rotate(0,   12, 13.5)"/>
+      <rect x="11.15" y="9.2"  width="1.7" height="1.6" rx="0.3" fill="black" transform="rotate(45,  12, 13.5)"/>
+      <rect x="11.15" y="9.2"  width="1.7" height="1.6" rx="0.3" fill="black" transform="rotate(90,  12, 13.5)"/>
+      <rect x="11.15" y="9.2"  width="1.7" height="1.6" rx="0.3" fill="black" transform="rotate(135, 12, 13.5)"/>
+      <rect x="11.15" y="9.2"  width="1.7" height="1.6" rx="0.3" fill="black" transform="rotate(180, 12, 13.5)"/>
+      <rect x="11.15" y="9.2"  width="1.7" height="1.6" rx="0.3" fill="black" transform="rotate(225, 12, 13.5)"/>
+      <rect x="11.15" y="9.2"  width="1.7" height="1.6" rx="0.3" fill="black" transform="rotate(270, 12, 13.5)"/>
+      <rect x="11.15" y="9.2"  width="1.7" height="1.6" rx="0.3" fill="black" transform="rotate(315, 12, 13.5)"/>
+      <!-- Gear body ring cutout -->
+      <circle cx="12" cy="13.5" r="2.9" fill="black"/>
+      <!-- Center dot kept visible (white = show through) -->
+      <circle cx="12" cy="13.5" r="1.35" fill="white"/>
+    </mask>
+  </defs>
+
+  <!-- Folder filled white, gear punched out transparently -->
+  <path d="M1.5 8.5C1.5 7.67 2.17 7 3 7H9.17L10.5 5.5H21C21.83 5.5 22.5 6.17 22.5 7V18C22.5 18.83 21.83 19.5 21 19.5H3C2.17 19.5 1.5 18.83 1.5 18V8.5Z"
+        fill="white" mask="url(#foldermask)"/>
+</svg>

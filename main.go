@@ -18,7 +18,7 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-//go:embed assets/forel-icon.png
+//go:embed assets/tray-icon.png
 var iconPNG []byte
 
 func main() {

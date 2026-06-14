@@ -135,10 +135,16 @@ input, select, textarea { font-family: inherit; font-size: 13px; color: var(--te
   height: 18px;
   border-radius: 4px;
   display: block;
+  margin-left: 15px;
+  margin-top: 10px;
+  flex-shrink: 0;
+  object-fit: contain;
+  object-position: center 38%;
 }
 .titlebar-title {
   font-size: 13px;
   font-weight: 600;
+  margin-top: 10px;
   color: var(--text);
   letter-spacing: 0.01em;
   line-height: 1;
