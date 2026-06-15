@@ -1,5 +1,5 @@
 import { ChevronDown, Eye, Play, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useForelStore } from "../store";
 import { PreviewResult, Rule } from "../types";
 import RuleEditor from "./RuleEditor";
@@ -21,24 +21,28 @@ export default function RuleList() {
   const [autoFocusEditorTitle, setAutoFocusEditorTitle] = useState(false);
   const [runResult, setRunResult] = useState<number | null>(null);
   const [previewResult, setPreviewResult] = useState<PreviewResult | null>(null);
+  const [previewFolderId, setPreviewFolderId] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
 
   const selectedFolder = folders.find((f) => f.id === selectedFolderId);
+  const visiblePreview =
+    previewFolderId === selectedFolderId ? previewResult : null;
 
-  useEffect(() => {
+  const clearPreview = () => {
     setPreviewResult(null);
-  }, [selectedFolderId]);
+    setPreviewFolderId(null);
+  };
 
   const handleAdd = async () => {
     if (!selectedFolderId) return;
-    setPreviewResult(null);
+    clearPreview();
     const rule = await createRule(selectedFolderId, "New Rule");
     setAutoFocusEditorTitle(true);
     setEditingRule(rule);
   };
 
   const handleEdit = (rule: Rule) => {
-    setPreviewResult(null);
+    clearPreview();
     setAutoFocusEditorTitle(false);
     setEditingRule(rule);
   };
@@ -50,7 +54,7 @@ export default function RuleList() {
 
   const handleRunNow = async () => {
     if (!selectedFolderId) return;
-    setPreviewResult(null);
+    clearPreview();
     const modifiedCount = await runRulesNow(selectedFolderId);
     setRunResult(modifiedCount);
     setTimeout(() => setRunResult(null), 4000);
@@ -62,18 +66,19 @@ export default function RuleList() {
     try {
       const result = await previewRules(selectedFolderId);
       setPreviewResult(result);
+      setPreviewFolderId(selectedFolderId);
     } finally {
       setPreviewing(false);
     }
   };
 
   const handleToggle = async (ruleId: string, enabled: boolean) => {
-    setPreviewResult(null);
+    clearPreview();
     await toggleRule(ruleId, enabled);
   };
 
   const handleDelete = async (ruleId: string) => {
-    setPreviewResult(null);
+    clearPreview();
     await deleteRule(ruleId);
   };
 
@@ -120,33 +125,33 @@ export default function RuleList() {
         </div>
       )}
 
-      {previewResult && (
+      {visiblePreview && (
         <section className="preview-panel">
           <div className="preview-header">
             <div>
               <h3 className="preview-title">Preview</h3>
               <p className="preview-summary">
-                {previewResult.files_scanned} file
-                {previewResult.files_scanned !== 1 ? "s" : ""} scanned,{" "}
-                {previewResult.matches.length} file
-                {previewResult.matches.length !== 1 ? "s" : ""} with matching rules.
+                {visiblePreview.files_scanned} file
+                {visiblePreview.files_scanned !== 1 ? "s" : ""} scanned,{" "}
+                {visiblePreview.matches.length} file
+                {visiblePreview.matches.length !== 1 ? "s" : ""} with matching rules.
               </p>
             </div>
             <button
               className="preview-close"
               type="button"
-              onClick={() => setPreviewResult(null)}
+              onClick={clearPreview}
               title="Close preview"
             >
               <X size={13} />
             </button>
           </div>
 
-          {previewResult.matches.length === 0 ? (
+          {visiblePreview.matches.length === 0 ? (
             <div className="preview-empty">No files would be changed.</div>
           ) : (
             <div className="preview-list">
-              {previewResult.matches.map((file) => (
+              {visiblePreview.matches.map((file) => (
                 <article className="preview-file" key={file.path}>
                   <div className="preview-file-name">{file.name || file.path}</div>
                   <div className="preview-file-path">{file.path}</div>
@@ -203,7 +208,7 @@ export default function RuleList() {
           rule={editingRule}
           autoFocusTitle={autoFocusEditorTitle}
           onClose={handleCloseEditor}
-          onSaved={() => setPreviewResult(null)}
+          onSaved={clearPreview}
         />
       )}
     </main>
