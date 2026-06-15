@@ -57,11 +57,44 @@ jobs:
       - name: Install dependencies (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare updater signing key
+        run: |
+          set -euo pipefail
+          key_path="$RUNNER_TEMP/tauri-updater.key"
+          decoded_key_path="$RUNNER_TEMP/tauri-updater.key.decoded"
+
+          if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+            echo "TAURI_SIGNING_PRIVATE_KEY is missing."
+            exit 1
+          fi
+
+          printf '%s' "$TAURI_SIGNING_PRIVATE_KEY" > "$key_path"
+          if base64 -D -i "$key_path" -o "$decoded_key_path" 2>/dev/null \
+            && head -n 1 "$decoded_key_path" | grep -q 'secret key'; then
+            :
+          else
+            printf '%s' "$TAURI_SIGNING_PRIVATE_KEY" | perl -pe 's/\\n/\n/g' > "$key_path"
+            if base64 -D -i "$key_path" -o "$decoded_key_path" 2>/dev/null \
+              && head -n 1 "$decoded_key_path" | grep -q 'secret key'; then
+              :
+            elif head -n 1 "$key_path" | grep -q 'secret key'; then
+              base64 -i "$key_path" -o "$RUNNER_TEMP/tauri-updater.key.encoded"
+              mv "$RUNNER_TEMP/tauri-updater.key.encoded" "$key_path"
+            else
+              echo "TAURI_SIGNING_PRIVATE_KEY is not a valid Tauri updater private key."
+              echo "Store the full .key file content in this secret, not the .pub file."
+              exit 1
+            fi
+          fi
+
+          echo "TAURI_SIGNING_PRIVATE_KEY=$key_path" >> "$GITHUB_ENV"
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+
       - name: Build DMG and updater archive (${{ matrix.suffix }})
         run: pnpm tauri build --target ${{ matrix.target }} --bundles app,dmg --ci
         env:
           APPLE_SIGNING_IDENTITY: "-"
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: Stage release files (${{ matrix.suffix }})
