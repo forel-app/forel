@@ -12,7 +12,7 @@
     "lint:fix": "eslint src --fix",
     "lint:rust": "cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings",
     "fmt:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml",
-    "test": "tsc --noEmit && cargo test --manifest-path src-tauri/Cargo.toml"
+    "test": "tsc --noEmit && cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

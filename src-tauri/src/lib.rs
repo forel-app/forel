@@ -44,7 +44,7 @@ pub fn run() {
                 let conn = db.lock().unwrap();
                 let paused = db::get_setting(&conn, "paused")
                     .unwrap_or_default()
-                    .map_or(false, |v| v == "1");
+                    .is_some_and(|v| v == "1");
                 if !paused {
                     if let Ok(folders) = db::list_folders(&conn) {
                         for folder in folders.iter().filter(|f| f.enabled) {
