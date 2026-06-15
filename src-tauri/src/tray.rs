@@ -109,9 +109,14 @@ fn handle_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
             let now_paused = !was_paused;
             state.paused.store(now_paused, Ordering::Relaxed);
 
-            // Collect paths under db lock, then send commands without holding it
+            // Collect paths under db lock, persist paused state, then send commands
             let paths: Vec<String> = {
                 let conn = state.db.lock().unwrap();
+                let _ = db::set_setting(
+                    &conn,
+                    "paused",
+                    if now_paused { "1" } else { "0" },
+                );
                 let folders = db::list_folders(&conn).unwrap_or_default();
                 if now_paused {
                     folders.into_iter().map(|f| f.path).collect()

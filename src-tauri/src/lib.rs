@@ -39,22 +39,28 @@ pub fn run() {
             let watcher_handle = watcher::start(Arc::clone(&db), app.handle().clone())
                 .expect("watcher failed to start");
 
-            // Start watching all currently enabled folders
-            {
+            // Restore paused state and start watching enabled folders
+            let was_paused = {
                 let conn = db.lock().unwrap();
-                if let Ok(folders) = db::list_folders(&conn) {
-                    for folder in folders.iter().filter(|f| f.enabled) {
-                        let _ = watcher_handle
-                            .tx
-                            .send(watcher::WatcherCmd::Add(folder.path.clone().into()));
+                let paused = db::get_setting(&conn, "paused")
+                    .unwrap_or_default()
+                    .map_or(false, |v| v == "1");
+                if !paused {
+                    if let Ok(folders) = db::list_folders(&conn) {
+                        for folder in folders.iter().filter(|f| f.enabled) {
+                            let _ = watcher_handle
+                                .tx
+                                .send(watcher::WatcherCmd::Add(folder.path.clone().into()));
+                        }
                     }
                 }
-            }
+                paused
+            };
 
             app.manage(AppState {
                 db,
                 watcher: Mutex::new(Some(watcher_handle)),
-                paused: Arc::new(AtomicBool::new(false)),
+                paused: Arc::new(AtomicBool::new(was_paused)),
             });
 
             // System tray icon

@@ -3,8 +3,9 @@ use rusqlite::Connection;
 
 mod v1_add_recursion_depth;
 mod v2_add_action_history;
+mod v3_add_app_settings;
 
-const CURRENT_SCHEMA_VERSION: i64 = 2;
+const CURRENT_SCHEMA_VERSION: i64 = 3;
 
 struct Migration {
     version: i64,
@@ -22,6 +23,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 2,
         name: "add action history table",
         apply: v2_add_action_history::apply,
+    },
+    Migration {
+        version: 3,
+        name: "add app settings table",
+        apply: v3_add_app_settings::apply,
     },
 ];
 

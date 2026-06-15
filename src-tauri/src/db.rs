@@ -75,11 +75,36 @@ pub fn init(conn: &Connection) -> Result<()> {
              created_at    TEXT NOT NULL
          );
          CREATE INDEX IF NOT EXISTS idx_action_history_batch ON action_history(batch_id);
-         CREATE INDEX IF NOT EXISTS idx_action_history_created ON action_history(created_at);",
+         CREATE INDEX IF NOT EXISTS idx_action_history_created ON action_history(created_at);
+
+         CREATE TABLE IF NOT EXISTS app_settings (
+             key   TEXT PRIMARY KEY,
+             value TEXT NOT NULL
+         );",
     )
     .context("schema init")?;
 
     migrations::run(conn)?;
+    Ok(())
+}
+
+// ---------- App settings ----------
+
+pub fn get_setting(conn: &Connection, key: &str) -> Result<Option<String>> {
+    let mut stmt = conn.prepare("SELECT value FROM app_settings WHERE key = ?1")?;
+    match stmt.query_row([key], |row| row.get(0)) {
+        Ok(v) => Ok(Some(v)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e.into()),
+    }
+}
+
+pub fn set_setting(conn: &Connection, key: &str, value: &str) -> Result<()> {
+    conn.execute(
+        "INSERT INTO app_settings (key, value) VALUES (?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![key, value],
+    )?;
     Ok(())
 }
 
@@ -692,7 +717,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .expect("read schema version");
-        assert_eq!(version, 2);
+        assert_eq!(version, 3);
 
         let has_column = table_has_column(&conn, "rules", "recursion_depth")
             .expect("inspect migrated schema");
@@ -702,7 +727,7 @@ mod tests {
     #[test]
     fn init_rejects_newer_schema_versions() {
         let conn = Connection::open_in_memory().expect("open in-memory database");
-        create_schema(&conn, 3, true);
+        create_schema(&conn, 4, true);
 
         let err = init(&conn).expect_err("reject newer schema");
         assert!(err.to_string().contains("newer than supported"));
@@ -760,7 +785,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .expect("read schema version");
-        assert_eq!(version, 2);
+        assert_eq!(version, 3);
 
         // The table is now usable.
         insert_history_entries(&conn, &[history_entry("b", ActionKind::Rename, true)])

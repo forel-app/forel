@@ -70,6 +70,9 @@ fn on_event(event: &Event, db: &Arc<Mutex<Connection>>) {
     }
 
     for path in &event.paths {
+        if path.file_name().is_some_and(|n| n == ".DS_Store") {
+            continue;
+        }
         let Some((folder, rules)) = load_folder_and_rules_for_path(path, db) else {
             continue;
         };
