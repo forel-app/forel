@@ -33,6 +33,7 @@ interface Props {
   rule: Rule;
   autoFocusTitle?: boolean;
   onClose: () => void;
+  onSaved?: () => void;
 }
 
 const STRING_OPERATORS: Operator[] = [
@@ -119,7 +120,7 @@ function operatorsFor(kind: ConditionKind): Operator[] {
   return STRING_OPERATORS;
 }
 
-export default function RuleEditor({ rule, autoFocusTitle = false, onClose }: Props) {
+export default function RuleEditor({ rule, autoFocusTitle = false, onClose, onSaved }: Props) {
   const { updateRule } = useForelStore();
   const [draft, setDraft] = useState<Rule>(structuredClone(rule));
   const [error, setError] = useState<string | null>(null);
@@ -141,6 +142,7 @@ export default function RuleEditor({ rule, autoFocusTitle = false, onClose }: Pr
     setSaving(true);
     try {
       await updateRule(draft);
+      onSaved?.();
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save rule.");
@@ -225,7 +227,7 @@ export default function RuleEditor({ rule, autoFocusTitle = false, onClose }: Pr
         <section className="editor-section">
           <div className="editor-section-header">
             <span>
-              Match{" "}
+              Files match when{" "}
               <select
                 value={draft.condition_match}
                 onChange={(e) =>
@@ -235,10 +237,10 @@ export default function RuleEditor({ rule, autoFocusTitle = false, onClose }: Pr
                   }))
                 }
               >
-                <option value="all">all</option>
-                <option value="any">any</option>
+                <option value="all">all conditions are true</option>
+                <option value="any">at least one condition is true</option>
               </select>{" "}
-              of the following conditions:
+              :
             </span>
             <button className="section-add-btn" onClick={addCondition}>
               <Plus size={12} />

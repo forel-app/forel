@@ -53,6 +53,21 @@ function groupByBatch(history: HistoryEntry[]): Batch[] {
   return batches;
 }
 
+function hasAppliedEntries(batch: Batch): boolean {
+  return batch.entries.some((e) => e.status === "applied");
+}
+
+function newestAppliedBatchByDir(batches: Batch[]): Map<string, string> {
+  const newest = new Map<string, string>();
+  for (const batch of batches) {
+    const dir = commonDir(batch.entries);
+    if (hasAppliedEntries(batch) && !newest.has(dir)) {
+      newest.set(dir, batch.id);
+    }
+  }
+  return newest;
+}
+
 export default function History({ onClose }: Props) {
   const { history, historyLoading, fetchHistory, undoEntry, undoBatch, clearHistory } =
     useForelStore();
@@ -63,6 +78,7 @@ export default function History({ onClose }: Props) {
   }, [fetchHistory]);
 
   const batches = useMemo(() => groupByBatch(history), [history]);
+  const newestAppliedByDir = useMemo(() => newestAppliedBatchByDir(batches), [batches]);
 
   const run = async (fn: () => Promise<unknown>) => {
     setError(null);
@@ -112,19 +128,27 @@ export default function History({ onClose }: Props) {
         ) : (
           <div className="history-list">
             {batches.map((batch) => {
+              const batchDir = commonDir(batch.entries);
               const canUndoBatch = batch.entries.some(
                 (e) => e.reversible && e.status === "applied",
               );
+              const isNewestAppliedBatch = newestAppliedByDir.get(batchDir) === batch.id;
+              const undoDisabled = !canUndoBatch || !isNewestAppliedBatch;
+              const undoTitle = !canUndoBatch
+                ? "No reversible applied actions in this run"
+                : !isNewestAppliedBatch
+                  ? "Undo newer activity in this folder first"
+                  : "Undo every reversible action in this run";
               return (
                 <section className="history-batch" key={batch.id}>
                   <div className="history-batch-header">
                     <div className="history-batch-info">
                       <span
                         className="history-batch-dir"
-                        title={commonDir(batch.entries)}
+                        title={batchDir}
                       >
                         <Folder size={12} className="history-batch-dir-icon" />
-                        {commonDir(batch.entries)}
+                        {batchDir}
                       </span>
                       <span className="history-batch-meta">
                         {formatTime(batch.at)} · {batch.entries.length} action
@@ -134,8 +158,8 @@ export default function History({ onClose }: Props) {
                     <button
                       className="btn btn-secondary btn-sm"
                       onClick={() => handleUndoBatch(batch.id)}
-                      disabled={!canUndoBatch}
-                      title="Undo every reversible action in this run"
+                      disabled={undoDisabled}
+                      title={undoTitle}
                     >
                       <Undo2 size={13} /> Undo batch
                     </button>

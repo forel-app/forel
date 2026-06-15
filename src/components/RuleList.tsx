@@ -1,5 +1,5 @@
 import { ChevronDown, Eye, Play, Plus, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForelStore } from "../store";
 import { PreviewResult, Rule } from "../types";
 import RuleEditor from "./RuleEditor";
@@ -25,14 +25,20 @@ export default function RuleList() {
 
   const selectedFolder = folders.find((f) => f.id === selectedFolderId);
 
+  useEffect(() => {
+    setPreviewResult(null);
+  }, [selectedFolderId]);
+
   const handleAdd = async () => {
     if (!selectedFolderId) return;
+    setPreviewResult(null);
     const rule = await createRule(selectedFolderId, "New Rule");
     setAutoFocusEditorTitle(true);
     setEditingRule(rule);
   };
 
   const handleEdit = (rule: Rule) => {
+    setPreviewResult(null);
     setAutoFocusEditorTitle(false);
     setEditingRule(rule);
   };
@@ -44,6 +50,7 @@ export default function RuleList() {
 
   const handleRunNow = async () => {
     if (!selectedFolderId) return;
+    setPreviewResult(null);
     const modifiedCount = await runRulesNow(selectedFolderId);
     setRunResult(modifiedCount);
     setTimeout(() => setRunResult(null), 4000);
@@ -58,6 +65,16 @@ export default function RuleList() {
     } finally {
       setPreviewing(false);
     }
+  };
+
+  const handleToggle = async (ruleId: string, enabled: boolean) => {
+    setPreviewResult(null);
+    await toggleRule(ruleId, enabled);
+  };
+
+  const handleDelete = async (ruleId: string) => {
+    setPreviewResult(null);
+    await deleteRule(ruleId);
   };
 
   if (!selectedFolderId) {
@@ -174,8 +191,8 @@ export default function RuleList() {
               rule={rule}
               index={index}
               onEdit={() => handleEdit(rule)}
-              onToggle={(enabled) => toggleRule(rule.id, enabled)}
-              onDelete={() => deleteRule(rule.id)}
+              onToggle={(enabled) => handleToggle(rule.id, enabled)}
+              onDelete={() => handleDelete(rule.id)}
             />
           ))}
         </ul>
@@ -186,6 +203,7 @@ export default function RuleList() {
           rule={editingRule}
           autoFocusTitle={autoFocusEditorTitle}
           onClose={handleCloseEditor}
+          onSaved={() => setPreviewResult(null)}
         />
       )}
     </main>
@@ -205,6 +223,11 @@ function RuleRow({
   onToggle: (v: boolean) => void;
   onDelete: () => void;
 }) {
+  const conditionSummary =
+    rule.conditions.length === 0
+      ? "every file in the folder"
+      : `${rule.conditions.length} condition${rule.conditions.length !== 1 ? "s" : ""}`;
+
   return (
     <li className={`rule-row ${rule.enabled ? "" : "rule-disabled"}`}>
       <div className="rule-order" aria-hidden="true">
@@ -223,7 +246,7 @@ function RuleRow({
       <div className="rule-info" onClick={onEdit}>
         <span className="rule-name">{rule.name}</span>
         <span className="rule-summary">
-          {rule.conditions.length} condition{rule.conditions.length !== 1 ? "s" : ""},{" "}
+          {conditionSummary},{" "}
           {rule.actions.length} action{rule.actions.length !== 1 ? "s" : ""}
         </span>
         <span className="rule-scope">{scopeLabel(rule.recursion_depth)}</span>

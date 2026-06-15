@@ -2,6 +2,7 @@
 // macro wraps them and passing by reference is not supported.
 #![allow(clippy::needless_pass_by_value)]
 
+use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 
 use tauri::{AppHandle, State};
@@ -379,10 +380,14 @@ pub fn get_history(state: State<AppState>) -> Result<Vec<HistoryEntry>, String> 
 /// Reverses a single history entry, then marks it as undone.
 #[tauri::command]
 pub fn undo_entry(id: String, state: State<AppState>) -> Result<(), String> {
-    let entry = {
+    let (entry, history) = {
         let conn = state.db.lock().map_err(|e| e.to_string())?;
-        db::get_history_entry(&conn, &id).map_err(|e| e.to_string())?
+        (
+            db::get_history_entry(&conn, &id).map_err(|e| e.to_string())?,
+            db::list_history(&conn).map_err(|e| e.to_string())?,
+        )
     };
+    ensure_batch_is_latest_applied(&entry.batch_id, &history)?;
 
     revert_entry(&entry)?;
 
@@ -395,10 +400,14 @@ pub fn undo_entry(id: String, state: State<AppState>) -> Result<(), String> {
 /// one entry does not abort the rest; failures are collected and reported.
 #[tauri::command]
 pub fn undo_batch(batch_id: String, state: State<AppState>) -> Result<UndoSummary, String> {
-    let entries = {
+    let (entries, history) = {
         let conn = state.db.lock().map_err(|e| e.to_string())?;
-        db::list_history_batch(&conn, &batch_id).map_err(|e| e.to_string())?
+        (
+            db::list_history_batch(&conn, &batch_id).map_err(|e| e.to_string())?,
+            db::list_history(&conn).map_err(|e| e.to_string())?,
+        )
     };
+    ensure_batch_is_latest_applied(&batch_id, &history)?;
 
     let mut undone = 0;
     let mut failed = Vec::new();
@@ -437,4 +446,76 @@ fn revert_entry(entry: &HistoryEntry) -> Result<(), String> {
     let undo: Undo = serde_json::from_value(entry.undo.clone())
         .map_err(|e| format!("corrupt undo data: {e}"))?;
     action::revert(&undo).map_err(|e| e.to_string())
+}
+
+fn ensure_batch_is_latest_applied(batch_id: &str, history: &[HistoryEntry]) -> Result<(), String> {
+    let target_entries: Vec<&HistoryEntry> = history
+        .iter()
+        .filter(|entry| entry.batch_id == batch_id)
+        .collect();
+    if target_entries.is_empty() {
+        return Ok(());
+    }
+
+    let target_dir = common_history_dir(target_entries.iter().copied());
+    let mut seen_target = false;
+    for entry in history {
+        if entry.batch_id == batch_id {
+            seen_target = true;
+            continue;
+        }
+        if seen_target {
+            continue;
+        }
+        if !matches!(entry.status, crate::rules::model::HistoryStatus::Applied) {
+            continue;
+        }
+        let entries = history
+            .iter()
+            .filter(|candidate| candidate.batch_id == entry.batch_id);
+        if common_history_dir(entries) == target_dir {
+            return Err("Undo newer activity in this folder first.".into());
+        }
+    }
+
+    Ok(())
+}
+
+fn common_history_dir<'a>(entries: impl Iterator<Item = &'a HistoryEntry>) -> PathBuf {
+    let dirs: Vec<Vec<String>> = entries
+        .map(|entry| path_components(parent_path(&entry.original_path)))
+        .collect();
+    let Some(first) = dirs.first() else {
+        return PathBuf::new();
+    };
+
+    let mut prefix = first.clone();
+    for dir in dirs.iter().skip(1) {
+        let len = prefix
+            .iter()
+            .zip(dir)
+            .take_while(|(left, right)| left == right)
+            .count();
+        prefix.truncate(len);
+    }
+
+    components_to_path(&prefix)
+}
+
+fn parent_path(path: &str) -> &Path {
+    Path::new(path).parent().unwrap_or_else(|| Path::new(""))
+}
+
+fn path_components(path: &Path) -> Vec<String> {
+    path.components()
+        .map(|component| component.as_os_str().to_string_lossy().to_string())
+        .collect()
+}
+
+fn components_to_path(components: &[String]) -> PathBuf {
+    let mut path = PathBuf::new();
+    for component in components {
+        path.push(component);
+    }
+    path
 }
