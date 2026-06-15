@@ -34,12 +34,13 @@ const MIGRATIONS: &[Migration] = &[
 pub fn run(conn: &Connection) -> Result<()> {
     let version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
     if version > CURRENT_SCHEMA_VERSION {
-        bail!(
-            "database schema version {version} is newer than supported {CURRENT_SCHEMA_VERSION}"
-        );
+        bail!("database schema version {version} is newer than supported {CURRENT_SCHEMA_VERSION}");
     }
 
-    for migration in MIGRATIONS.iter().filter(|migration| migration.version > version) {
+    for migration in MIGRATIONS
+        .iter()
+        .filter(|migration| migration.version > version)
+    {
         run_migration(conn, migration)?;
     }
 

@@ -719,8 +719,8 @@ mod tests {
             .expect("read schema version");
         assert_eq!(version, 3);
 
-        let has_column = table_has_column(&conn, "rules", "recursion_depth")
-            .expect("inspect migrated schema");
+        let has_column =
+            table_has_column(&conn, "rules", "recursion_depth").expect("inspect migrated schema");
         assert!(has_column);
     }
 

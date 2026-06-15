@@ -31,8 +31,12 @@ pub fn run() {
             std::fs::create_dir_all(&data_dir)?;
 
             let db_path = data_dir.join("forel.db");
+            let first_run = !db_path.exists();
             let conn = rusqlite::Connection::open(&db_path)?;
             db::init(&conn)?;
+            if first_run && db::get_setting(&conn, "paused")?.is_none() {
+                db::set_setting(&conn, "paused", "1")?;
+            }
 
             let db = Arc::new(Mutex::new(conn));
 

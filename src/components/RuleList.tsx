@@ -18,6 +18,7 @@ export default function RuleList() {
   } = useForelStore();
 
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
+  const [autoFocusEditorTitle, setAutoFocusEditorTitle] = useState(false);
   const [runResult, setRunResult] = useState<number | null>(null);
   const [previewResult, setPreviewResult] = useState<PreviewResult | null>(null);
   const [previewing, setPreviewing] = useState(false);
@@ -27,7 +28,18 @@ export default function RuleList() {
   const handleAdd = async () => {
     if (!selectedFolderId) return;
     const rule = await createRule(selectedFolderId, "New Rule");
+    setAutoFocusEditorTitle(true);
     setEditingRule(rule);
+  };
+
+  const handleEdit = (rule: Rule) => {
+    setAutoFocusEditorTitle(false);
+    setEditingRule(rule);
+  };
+
+  const handleCloseEditor = () => {
+    setEditingRule(null);
+    setAutoFocusEditorTitle(false);
   };
 
   const handleRunNow = async () => {
@@ -161,7 +173,7 @@ export default function RuleList() {
               key={rule.id}
               rule={rule}
               index={index}
-              onEdit={() => setEditingRule(rule)}
+              onEdit={() => handleEdit(rule)}
               onToggle={(enabled) => toggleRule(rule.id, enabled)}
               onDelete={() => deleteRule(rule.id)}
             />
@@ -170,7 +182,11 @@ export default function RuleList() {
       )}
 
       {editingRule && (
-        <RuleEditor rule={editingRule} onClose={() => setEditingRule(null)} />
+        <RuleEditor
+          rule={editingRule}
+          autoFocusTitle={autoFocusEditorTitle}
+          onClose={handleCloseEditor}
+        />
       )}
     </main>
   );

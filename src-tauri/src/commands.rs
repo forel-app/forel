@@ -2,6 +2,8 @@
 // macro wraps them and passing by reference is not supported.
 #![allow(clippy::needless_pass_by_value)]
 
+use std::sync::atomic::Ordering;
+
 use tauri::{AppHandle, State};
 
 use serde::Serialize;
@@ -37,9 +39,11 @@ pub fn add_watched_folder(
         let conn = state.db.lock().map_err(|e| e.to_string())?;
         db::insert_folder(&conn, &folder).map_err(|e| e.to_string())?;
     }
-    if let Ok(watcher) = state.watcher.lock() {
-        if let Some(w) = watcher.as_ref() {
-            let _ = w.tx.send(WatcherCmd::Add(path.into()));
+    if !state.paused.load(Ordering::Relaxed) {
+        if let Ok(watcher) = state.watcher.lock() {
+            if let Some(w) = watcher.as_ref() {
+                let _ = w.tx.send(WatcherCmd::Add(path.into()));
+            }
         }
     }
     tray::rebuild(&app);
@@ -97,7 +101,7 @@ pub fn toggle_watched_folder(
         .ok()
     };
 
-    if let Some(p) = path {
+    if let Some(p) = path.filter(|_| !enabled || !state.paused.load(Ordering::Relaxed)) {
         if let Ok(watcher) = state.watcher.lock() {
             if let Some(w) = watcher.as_ref() {
                 let cmd = if enabled {

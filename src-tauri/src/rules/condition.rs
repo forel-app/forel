@@ -12,7 +12,7 @@ pub fn evaluate(condition: &Condition, path: &Path) -> Result<bool> {
         ConditionKind::Name => {
             let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
             Ok(match_string(&condition.operator, name, &condition.value))
-        }
+        },
 
         ConditionKind::Extension => {
             let ext = path
@@ -22,7 +22,7 @@ pub fn evaluate(condition: &Condition, path: &Path) -> Result<bool> {
                 .to_lowercase();
             let value = condition.value.trim_start_matches('.').to_lowercase();
             Ok(match_string(&condition.operator, &ext, &value))
-        }
+        },
 
         ConditionKind::Kind => {
             let detected = detect_kind(path, &meta);
@@ -31,7 +31,7 @@ pub fn evaluate(condition: &Condition, path: &Path) -> Result<bool> {
                 Operator::IsNot => detected != condition.value,
                 _ => false,
             })
-        }
+        },
 
         ConditionKind::SizeBytes => {
             let size = meta.len();
@@ -43,7 +43,7 @@ pub fn evaluate(condition: &Condition, path: &Path) -> Result<bool> {
                 Operator::LessThan => size < threshold,
                 _ => false,
             })
-        }
+        },
 
         ConditionKind::Tags => {
             let target = condition.value.trim().to_lowercase();
@@ -63,7 +63,7 @@ pub fn evaluate(condition: &Condition, path: &Path) -> Result<bool> {
                     .is_ok_and(|re| names.iter().any(|n| re.is_match(n))),
                 _ => false,
             })
-        }
+        },
 
         ConditionKind::ColorLabel => {
             let target = condition.value.to_lowercase();
@@ -77,7 +77,7 @@ pub fn evaluate(condition: &Condition, path: &Path) -> Result<bool> {
                 Operator::IsNot => !has,
                 _ => false,
             })
-        }
+        },
 
         ConditionKind::Contents => {
             const MAX_CONTENT_BYTES: u64 = 10 * 1024 * 1024; // 10 MB
@@ -86,7 +86,7 @@ pub fn evaluate(condition: &Condition, path: &Path) -> Result<bool> {
             }
             let text = std::fs::read_to_string(path).unwrap_or_default();
             Ok(match_string(&condition.operator, &text, &condition.value))
-        }
+        },
     }
 }
 
@@ -113,11 +113,11 @@ fn detect_kind(path: &Path, meta: &std::fs::Metadata) -> &'static str {
 
         Some("mp4" | "mov" | "avi" | "mkv" | "m4v" | "wmv" | "flv" | "webm" | "mpg" | "mpeg") => {
             "movie"
-        }
+        },
 
         Some("mp3" | "aac" | "flac" | "wav" | "aiff" | "aif" | "m4a" | "ogg" | "wma" | "opus") => {
             "music"
-        }
+        },
 
         Some("pdf") => "pdf",
 
@@ -143,8 +143,7 @@ fn match_string(operator: &Operator, haystack: &str, needle: &str) -> bool {
         Operator::DoesNotContain => !haystack.contains(needle),
         Operator::StartsWith => haystack.starts_with(needle),
         Operator::EndsWith => haystack.ends_with(needle),
-        Operator::MatchesRegex => regex::Regex::new(needle)
-            .is_ok_and(|re| re.is_match(haystack)),
+        Operator::MatchesRegex => regex::Regex::new(needle).is_ok_and(|re| re.is_match(haystack)),
         _ => false,
     }
 }

@@ -74,7 +74,10 @@ fn move_into_dir(path: &Path, dest_dir: &Path) -> Result<Applied> {
         .with_context(|| format!("move {} → {}", path.display(), dest.display()))?;
     Ok(Applied {
         new_path: dest.clone(),
-        undo: Undo::Move { from: path.to_path_buf(), to: dest },
+        undo: Undo::Move {
+            from: path.to_path_buf(),
+            to: dest,
+        },
     })
 }
 
@@ -100,7 +103,10 @@ fn rename_file(action: &Action, path: &Path) -> Result<Applied> {
         .with_context(|| format!("rename {} → {}", path.display(), dest.display()))?;
     Ok(Applied {
         new_path: dest.clone(),
-        undo: Undo::Move { from: path.to_path_buf(), to: dest },
+        undo: Undo::Move {
+            from: path.to_path_buf(),
+            to: dest,
+        },
     })
 }
 
@@ -117,11 +123,20 @@ fn apply_tags(action: &Action, path: &Path, add: bool) -> Result<Applied> {
         apply_file_tag(path, tag, add)?;
     }
     let undo = if add {
-        Undo::AddTags { path: path.to_path_buf(), tags: changed }
+        Undo::AddTags {
+            path: path.to_path_buf(),
+            tags: changed,
+        }
     } else {
-        Undo::RemoveTags { path: path.to_path_buf(), tags: changed }
+        Undo::RemoveTags {
+            path: path.to_path_buf(),
+            tags: changed,
+        }
     };
-    Ok(Applied { new_path: path.to_path_buf(), undo })
+    Ok(Applied {
+        new_path: path.to_path_buf(),
+        undo,
+    })
 }
 
 fn set_color(action: &Action, path: &Path) -> Result<Applied> {
@@ -134,7 +149,10 @@ fn set_color(action: &Action, path: &Path) -> Result<Applied> {
     set_color_label(path, color)?;
     Ok(Applied {
         new_path: path.to_path_buf(),
-        undo: Undo::Color { path: path.to_path_buf(), previous },
+        undo: Undo::Color {
+            path: path.to_path_buf(),
+            previous,
+        },
     })
 }
 
@@ -385,7 +403,9 @@ fn apply_rename_pattern(pattern: &str, path: &Path) -> Result<String> {
 
     // Append the original extension only when the pattern did not place it
     // explicitly (via the {extension} token or by typing it literally).
-    let already_has_ext = result.to_lowercase().ends_with(&format!(".{}", ext.to_lowercase()));
+    let already_has_ext = result
+        .to_lowercase()
+        .ends_with(&format!(".{}", ext.to_lowercase()));
     if ext.is_empty() || pattern.contains("{extension}") || already_has_ext {
         Ok(result)
     } else {
@@ -400,7 +420,10 @@ fn unique_dest(dir: &Path, file_name: &std::ffi::OsStr) -> PathBuf {
     if !candidate.exists() {
         return candidate;
     }
-    let stem = Path::new(file_name).file_stem().and_then(|s| s.to_str()).unwrap_or("");
+    let stem = Path::new(file_name)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("");
     let ext = Path::new(file_name).extension().and_then(|s| s.to_str());
     for i in 1u64.. {
         let new_name = match ext {
@@ -633,8 +656,10 @@ mod tests {
         let dir = TestDir::new();
         let file = dir.file("note.txt", "hello");
         let dest = dir.path.join("Archive");
-        let move_action =
-            test_action(ActionKind::MoveToFolder, json!({ "destination": dest.to_string_lossy() }));
+        let move_action = test_action(
+            ActionKind::MoveToFolder,
+            json!({ "destination": dest.to_string_lossy() }),
+        );
 
         let applied = execute(&move_action, &file).expect("move file");
         assert!(!file.exists());
@@ -665,8 +690,10 @@ mod tests {
         let dir = TestDir::new();
         let file = dir.file("data.bin", "x");
         let dest = dir.path.join("Backup");
-        let copy_action =
-            test_action(ActionKind::CopyToFolder, json!({ "destination": dest.to_string_lossy() }));
+        let copy_action = test_action(
+            ActionKind::CopyToFolder,
+            json!({ "destination": dest.to_string_lossy() }),
+        );
 
         let applied = execute(&copy_action, &file).expect("copy file");
         assert!(file.exists());

@@ -31,6 +31,7 @@ const RENAME_TOKENS: { key: string; label: string; example: string }[] = [
 
 interface Props {
   rule: Rule;
+  autoFocusTitle?: boolean;
   onClose: () => void;
 }
 
@@ -118,11 +119,16 @@ function operatorsFor(kind: ConditionKind): Operator[] {
   return STRING_OPERATORS;
 }
 
-export default function RuleEditor({ rule, onClose }: Props) {
+export default function RuleEditor({ rule, autoFocusTitle = false, onClose }: Props) {
   const { updateRule } = useForelStore();
   const [draft, setDraft] = useState<Rule>(structuredClone(rule));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (autoFocusTitle) titleInputRef.current?.focus();
+  }, [autoFocusTitle]);
 
   const save = async () => {
     const problem = validateRule(draft);
@@ -205,6 +211,7 @@ export default function RuleEditor({ rule, onClose }: Props) {
       <div className="editor-panel">
         <div className="editor-header">
           <input
+            ref={titleInputRef}
             className="editor-title-input"
             value={draft.name}
             onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
