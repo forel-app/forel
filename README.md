@@ -122,14 +122,6 @@ For a full walkthrough, see the [Getting Started guide](docs/getting-started.md)
 
 ---
 
-## Screenshots
-
-![Forel main view — folder list and rule preview](assets/screenshot-main.png)
-
-![Forel rule editor — conditions and actions](assets/screenshot-editor.png)
-
----
-
 ## Architecture
 
 Forel is built with [Tauri 2](https://tauri.app): a **Rust backend** for system-level work and a **React frontend** for the UI, compiled into a native macOS app.
