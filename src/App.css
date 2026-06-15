@@ -137,7 +137,7 @@ input, select, textarea { font-family: inherit; font-size: 13px; color: var(--te
   display: block;
 }
 .titlebar-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text);
   letter-spacing: 0.01em;
@@ -610,24 +610,26 @@ input, select, textarea { font-family: inherit; font-size: 13px; color: var(--te
 /* ---- Condition / Action rows ---- */
 .condition-row, .action-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 6px;
   margin-bottom: 6px;
 }
 
 .condition-row select, .action-row select {
+  height: 28px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  padding: 5px 7px;
+  padding: 0 7px;
   background: var(--bg-control);
   color: var(--text);
 }
 
 .condition-value, .action-value {
   flex: 1;
+  height: 28px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  padding: 5px 9px;
+  padding: 0 9px;
   background: var(--bg-control);
 }
 .condition-value:focus, .action-value:focus {
@@ -658,7 +660,6 @@ input, select, textarea { font-family: inherit; font-size: 13px; color: var(--te
   padding: 5px;
   border-radius: 6px;
   flex-shrink: 0;
-  margin-top: 1px;
 }
 .row-remove:hover { color: var(--danger); background: rgba(255, 59, 48, 0.1); }
 
