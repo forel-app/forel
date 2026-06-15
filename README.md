@@ -179,6 +179,7 @@ forel/
 - [ ] Action history & undo
 - [ ] Native notifications on rule actions
 - [ ] Activity logs
+- [ ] Drag & drop to reorder rules
 - [ ] Preferences: launch at login
 - [x] Automatic updates
 - [ ] AI features
