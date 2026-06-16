@@ -155,11 +155,11 @@ jobs:
             "platforms": {
               "darwin-aarch64": {
                 "signature": "$arm_sig",
-                "url": "https://github.com/lguichard/forel/releases/download/${GITHUB_REF_NAME}/Forel-${GITHUB_REF_NAME}-darwin-arm64.app.tar.gz"
+                "url": "https://github.com/forel-app/forel/releases/download/${GITHUB_REF_NAME}/Forel-${GITHUB_REF_NAME}-darwin-arm64.app.tar.gz"
               },
               "darwin-x86_64": {
                 "signature": "$intel_sig",
-                "url": "https://github.com/lguichard/forel/releases/download/${GITHUB_REF_NAME}/Forel-${GITHUB_REF_NAME}-darwin-x86_64.app.tar.gz"
+                "url": "https://github.com/forel-app/forel/releases/download/${GITHUB_REF_NAME}/Forel-${GITHUB_REF_NAME}-darwin-x86_64.app.tar.gz"
               }
             }
           }

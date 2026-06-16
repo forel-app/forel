@@ -11,8 +11,8 @@
 [![Rust](https://img.shields.io/badge/Rust-2021-orange?style=flat-square&logo=rust)](https://www.rust-lang.org)
 [![React 19](https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react)](https://react.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/lguichard/forel?style=flat-square)](https://github.com/lguichard/forel/stargazers)
-[![Status](https://img.shields.io/badge/status-alpha-red?style=flat-square)](https://github.com/lguichard/forel)
+[![Stars](https://img.shields.io/github/stars/forel-app/forel?style=flat-square)](https://github.com/forel-app/forel/stargazers)
+[![Status](https://img.shields.io/badge/status-alpha-red?style=flat-square)](https://github.com/forel-app/forel)
 
 [Download](#installation) · [Documentation](docs/) · [Contributing](CONTRIBUTING.md)
 
@@ -86,14 +86,14 @@ brew install --cask forel
 
 ### Manual
 
-Download the latest `.dmg` from the [Releases](https://github.com/lguichard/forel/releases) page, open it, and drag Forel to your Applications folder.
+Download the latest `.dmg` from the [Releases](https://github.com/forel-app/forel/releases) page, open it, and drag Forel to your Applications folder.
 
 ### Build from source
 
 **Prerequisites:** [Rust](https://rustup.rs) · [Node.js 20+](https://nodejs.org) · [pnpm](https://pnpm.io)
 
 ```bash
-git clone https://github.com/lguichard/forel.git
+git clone https://github.com/forel-app/forel.git
 cd forel
 pnpm install
 pnpm tauri dev
@@ -191,7 +191,7 @@ forel/
 Forel is in early development and contributions are very welcome.
 
 ```bash
-git clone https://github.com/lguichard/forel.git
+git clone https://github.com/forel-app/forel.git
 cd forel
 pnpm install
 pnpm tauri dev   # hot-reload frontend + Rust backend

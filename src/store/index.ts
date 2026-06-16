@@ -14,7 +14,7 @@ import {
 } from "../types";
 
 const releaseUrl = (version: string) =>
-  `https://github.com/lguichard/forel/releases/tag/${
+  `https://github.com/forel-app/forel/releases/tag/${
     version.startsWith("v") ? version : `v${version}`
   }`;
 

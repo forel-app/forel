@@ -41,7 +41,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERBNkNCMzZDMjZDNTNBMjAKUldRZ09zVW1iTE5zMnJVZ0lTc3ZTZ0NrbjBEdXFKdnVMY0U3M2RjNjd3RDcvemUxdEttenc3WU8K",
       "endpoints": [
-        "https://github.com/lguichard/forel/releases/latest/download/latest.json"
+        "https://github.com/forel-app/forel/releases/latest/download/latest.json"
       ]
     }
   }

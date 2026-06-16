@@ -175,14 +175,14 @@ export default function Settings({
             <div className="settings-about-links">
               <button
                 className="settings-about-link"
-                onClick={() => void openUrl("https://github.com/lguichard/forel")}
+                onClick={() => void openUrl("https://github.com/forel-app/forel")}
               >
                 <ExternalLink size={12} /> GitHub
               </button>
               <span className="settings-about-sep">·</span>
               <button
                 className="settings-about-link"
-                onClick={() => void openUrl("https://github.com/lguichard/forel/blob/main/CONTRIBUTING.md")}
+                onClick={() => void openUrl("https://github.com/forel-app/forel/blob/main/CONTRIBUTING.md")}
               >
                 Contributing welcome
               </button>
