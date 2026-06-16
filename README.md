@@ -176,12 +176,16 @@ forel/
 - [x] Actions: move, copy, rename, trash, delete, tag, open with, run script
 - [x] SQLite persistence
 - [x] macOS menu bar icon with live rule toggle
-- [ ] Action history & undo
+- [x] Action history & undo
+- [x] Automatic updates
+- [x] Preferences: launch at login
+- [ ] Sync actions
+- [ ] Upload actions
 - [ ] Native notifications on rule actions
 - [ ] Activity logs
 - [ ] Drag & drop to reorder rules
-- [ ] Preferences: launch at login
-- [x] Automatic updates
+- [ ] Rules based metadata files
+- [ ] Automatic cleaning database
 - [ ] AI features
 
 ---

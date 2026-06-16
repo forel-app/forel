@@ -32,6 +32,41 @@ fn tray_icon() -> tauri::image::Image<'static> {
     tauri::include_image!("icons/tray-icon.png")
 }
 
+/// Builds the menu-bar icon: the base glyph tinted to match the menu bar (white on
+/// a dark menu bar, black on a light one) with a status dot in the bottom-right
+/// corner — green when watching, red when paused. Rendered as a non-template image,
+/// since template images cannot carry colour; appearance is handled manually and
+/// the icon is rebuilt on `ThemeChanged`.
+fn icon_with_dot(paused: bool, dark: bool) -> tauri::image::Image<'static> {
+    let base = tray_icon();
+    let width = base.width();
+    let height = base.height();
+    let mut rgba = base.rgba().to_vec();
+
+    // Tint the white glyph to match the menu bar, keeping its alpha as the mask.
+    let glyph = if dark { 255 } else { 0 };
+    for px in rgba.chunks_exact_mut(4) {
+        if px[3] > 0 {
+            px[0] = glyph;
+            px[1] = glyph;
+            px[2] = glyph;
+        }
+    }
+
+    let color = if paused {
+        [255, 69, 58, 255]
+    } else {
+        [52, 199, 89, 255]
+    };
+    let radius = (width / 7).cast_signed();
+    let margin = radius / 3;
+    let cx = width.cast_signed() - radius - margin;
+    let cy = height.cast_signed() - radius - margin;
+    fill_circle(&mut rgba, width, cx, cy, radius, color);
+
+    tauri::image::Image::new_owned(rgba, width, height)
+}
+
 fn status_icon(paused: bool) -> tauri::image::Image<'static> {
     let mut rgba = vec![0u8; (STATUS_ICON_SIZE * STATUS_ICON_SIZE * 4) as usize];
     let color = if paused {
@@ -61,13 +96,21 @@ fn set_pixel(rgba: &mut [u8], size: u32, x: u32, y: u32, color: [u8; 4]) {
     rgba[i..i + 4].copy_from_slice(&color);
 }
 
+/// Whether the menu bar is dark. Follows the OS appearance via the main window's
+/// theme; defaults to dark (white glyph) when unknown.
+fn menu_bar_is_dark(app: &AppHandle) -> bool {
+    app.get_webview_window("main")
+        .and_then(|w| w.theme().ok())
+        .is_none_or(|theme| theme == tauri::Theme::Dark)
+}
+
 pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     let menu = build_menu(app)?;
-    let icon = tray_icon();
+    let paused = app.state::<AppState>().paused.load(Ordering::Relaxed);
 
     TrayIconBuilder::with_id(TRAY_ID)
-        .icon(icon)
-        .icon_as_template(true)
+        .icon(icon_with_dot(paused, menu_bar_is_dark(app)))
+        .icon_as_template(false)
         .menu(&menu)
         .tooltip("Forel")
         .show_menu_on_left_click(true)
@@ -77,10 +120,12 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
 }
 
 pub fn rebuild(app: &AppHandle) {
+    let paused = app.state::<AppState>().paused.load(Ordering::Relaxed);
+    let dark = menu_bar_is_dark(app);
     if let Ok(menu) = build_menu(app) {
         if let Some(tray) = app.tray_by_id(TRAY_ID) {
             let _ = tray.set_menu(Some(menu));
-            let _ = tray.set_icon_with_as_template(Some(tray_icon()), true);
+            let _ = tray.set_icon_with_as_template(Some(icon_with_dot(paused, dark)), false);
         }
     }
 }
@@ -163,9 +208,9 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
 
     // Status row + toggle — descriptive text forces a decent menu width
     let (status_label, action_label) = if paused {
-        ("File watching is paused", "Start Watching")
+        ("File watching is stopped", "Start Watching")
     } else {
-        ("File watching is active", "Stop Watching")
+        ("File watching is running", "Stop Watching")
     };
 
     items.push(TrayItem::Icon(
