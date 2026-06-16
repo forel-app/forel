@@ -82,13 +82,18 @@ pub fn run() {
                 let _ = win.show();
             }
 
-            // Hide window on close instead of quitting
+            // Hide window on close instead of quitting; rebuild the tray icon when
+            // the system appearance flips so the glyph stays legible (white/black).
             let win_clone = win.clone();
-            win.on_window_event(move |event| {
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            win.on_window_event(move |event| match event {
+                tauri::WindowEvent::CloseRequested { api, .. } => {
                     api.prevent_close();
                     let _ = win_clone.hide();
-                }
+                },
+                tauri::WindowEvent::ThemeChanged(_) => {
+                    tray::rebuild(win_clone.app_handle());
+                },
+                _ => {},
             });
 
             Ok(())
