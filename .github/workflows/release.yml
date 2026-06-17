@@ -33,74 +33,8 @@ jobs:
           xcodebuild -version
           swift --version
 
-      - name: Build release binary
-        run: swift build -c release --arch ${{ matrix.arch }}
-
-      - name: Package app bundle
-        run: |
-          set -euo pipefail
-
-          version="${GITHUB_REF_NAME#v}"
-          build_dir=".build/release"
-          bundle_root="$RUNNER_TEMP/Forel.app"
-          contents="$bundle_root/Contents"
-          macos_dir="$contents/MacOS"
-          resources_dir="$contents/Resources"
-          resource_bundle="$(find "$build_dir" -maxdepth 1 -name "*.resources" -type d -print -quit)"
-
-          rm -rf "$bundle_root"
-          mkdir -p "$macos_dir" "$resources_dir"
-
-          cp "$build_dir/ForelApp" "$macos_dir/ForelApp"
-          chmod +x "$macos_dir/ForelApp"
-
-          if [ -n "$resource_bundle" ]; then
-            cp -R "$resource_bundle" "$resources_dir/"
-          fi
-
-          cat > "$contents/Info.plist" <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>CFBundleDevelopmentRegion</key>
-            <string>en</string>
-            <key>CFBundleDisplayName</key>
-            <string>Forel</string>
-            <key>CFBundleExecutable</key>
-            <string>ForelApp</string>
-            <key>CFBundleIdentifier</key>
-            <string>com.forel.app</string>
-            <key>CFBundleInfoDictionaryVersion</key>
-            <string>6.0</string>
-            <key>CFBundleName</key>
-            <string>Forel</string>
-            <key>CFBundlePackageType</key>
-            <string>APPL</string>
-            <key>CFBundleShortVersionString</key>
-            <string>${version}</string>
-            <key>CFBundleVersion</key>
-            <string>${version}</string>
-            <key>LSApplicationCategoryType</key>
-            <string>public.app-category.productivity</string>
-            <key>LSMinimumSystemVersion</key>
-            <string>14.0</string>
-            <key>LSUIElement</key>
-            <true/>
-            <key>NSHighResolutionCapable</key>
-            <true/>
-          </dict>
-          </plist>
-          EOF
-
-          mkdir -p dist/release
-          cp -R "$bundle_root" "dist/release/Forel.app"
-          hdiutil create \
-            -volname "Forel" \
-            -srcfolder "dist/release/Forel.app" \
-            -ov \
-            -format UDZO \
-            "dist/release/Forel-${GITHUB_REF_NAME}-${{ matrix.suffix }}.dmg"
+      - name: Build and package
+        run: ./build.sh package ${{ matrix.arch }} ${{ github.ref_name }}
 
       - name: Upload release artifact (${{ matrix.suffix }})
         uses: actions/upload-artifact@v4
