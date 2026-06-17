@@ -48,11 +48,36 @@
             </div>
             <p class="hero-note">macOS 14+ · 100% on-device · MIT licensed</p>
           </div>
-          <div class="hero-shot">
-            <img
-              src="assets/app-screen-1.png"
-              alt="Forel main window showing watched folders and rules"
-            />
+          <div class="hero-shot hero-carousel" aria-label="Forel app screenshots">
+            <div class="hero-carousel-track">
+              <figure class="hero-carousel-slide hero-carousel-slide-1 is-active">
+                <img
+                  src="assets/app-screen-1.png"
+                  alt="Forel main window showing watched folders and rules"
+                  loading="eager"
+                  fetchpriority="high"
+                />
+              </figure>
+              <figure class="hero-carousel-slide hero-carousel-slide-2">
+                <img
+                  src="assets/app-screen-2.png"
+                  alt="Forel rule editor showing conditions and actions"
+                  loading="eager"
+                />
+              </figure>
+              <figure class="hero-carousel-slide hero-carousel-slide-3">
+                <img
+                  src="assets/app-screen-3.png"
+                  alt="Forel rules list view with multiple active rules"
+                  loading="eager"
+                />
+              </figure>
+            </div>
+            <div class="hero-carousel-indicators" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
           </div>
         </div>
       </section>
@@ -143,6 +168,26 @@
         </div>
       </section>
 
+      <section class="section menubar-section">
+        <div class="section-inner">
+          <div class="section-heading">
+            <p class="eyebrow">Menu bar first</p>
+            <h2>Modern, glanceable, and always there.</h2>
+            <p>
+              Forel keeps the menu bar front and center with a translucent popover that shows
+              what is active right away. You can see the current state in one glance, without
+              opening the main window.
+            </p>
+          </div>
+          <div class="screenshot-band">
+            <img
+              src="assets/app-screen-3.png"
+              alt="Forel menu bar popover preview showing live status and watched folders"
+            />
+          </div>
+        </div>
+      </section>
+
       <section class="section privacy-section" id="privacy">
         <div class="section-inner feature-grid">
           <article class="feature">
@@ -191,5 +236,32 @@
         <a href="https://github.com/lguichard/forel">GitHub</a>
       </div>
     </footer>
+
+    <script>
+      (() => {
+        const slides = Array.from(document.querySelectorAll('.hero-carousel-slide'));
+        const dots = Array.from(document.querySelectorAll('.hero-carousel-indicators span'));
+        if (slides.length < 2) return;
+
+        let index = 0;
+        const intervalMs = 5000;
+        const transitionMs = 700;
+
+        const setActive = (nextIndex) => {
+          slides[index].classList.remove('is-active');
+          dots[index]?.classList.remove('is-active');
+          index = nextIndex;
+          slides[index].classList.add('is-active');
+          dots[index]?.classList.add('is-active');
+        };
+
+        dots[index]?.classList.add('is-active');
+        window.setInterval(() => setActive((index + 1) % slides.length), intervalMs);
+
+        slides.forEach((slide) => {
+          slide.style.transitionDuration = `${transitionMs}ms`;
+        });
+      })();
+    </script>
   </body>
 </html>

@@ -3,7 +3,7 @@
 All notable changes to Forel are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.0.1-beta.1] - 2026-06-17
+## [0.1.0-beta.1] - 2026-06-17
 
 The app has been rewritten from scratch in Swift, replacing the previous
 Tauri + React + Rust stack (archived under `tauri/`). This isn't a port for
@@ -30,9 +30,9 @@ macOS-native experience, aimed at being a credible alternative to Hazel.
 - Action history with undo/redo per entry and per batch.
 
 ### Changed
-- Versioning resets to `0.0.x` for this Swift-native line, to mark it as a
-  distinct lineage from the Tauri-era `0.1.0-alpha.x` releases below rather
-  than implying continuity with that codebase.
+- Continues the existing `0.1.0.x` line started by the Tauri-era alphas
+  below — this beta is the same product, rebuilt on a native stack, not a
+  fresh project.
 
 ### Removed
 - The Tauri/React frontend and Rust backend are no longer the active app;
