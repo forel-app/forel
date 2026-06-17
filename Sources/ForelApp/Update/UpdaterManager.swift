@@ -109,14 +109,23 @@ final class UpdaterManager: ObservableObject {
             guard let release = await Self.fetchLatestRelease() else { return }
             let current = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
             let latest = Self.version(of: release)
-            if Self.isNewer(latest, than: current) {
-                updateAvailable = true
-                latestVersion = latest
-                releaseURL = release.htmlUrl
-                pendingAssetURL = release.assets.first {
-                    $0.name.hasSuffix(".dmg") && $0.name.contains(Self.archSuffix)
-                }?.browserDownloadURL
-            }
+            guard Self.isNewer(latest, than: current) else { return }
+
+            // The release notes/publish step (`action-gh-release`) creates the
+            // GitHub Release and then uploads its .dmg assets — there's a real
+            // window, while a tag's workflow is still running, where the
+            // release is already visible via the API but the matching asset
+            // isn't attached yet. Don't announce an update the user can't
+            // actually download; the next check (or "Check Now") will pick it
+            // up once the asset shows up.
+            guard let asset = release.assets.first(where: {
+                $0.name.hasSuffix(".dmg") && $0.name.contains(Self.archSuffix)
+            }) else { return }
+
+            updateAvailable = true
+            latestVersion = latest
+            releaseURL = release.htmlUrl
+            pendingAssetURL = asset.browserDownloadURL
         }
     }
 

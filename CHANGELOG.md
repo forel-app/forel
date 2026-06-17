@@ -12,6 +12,8 @@ All notable changes to Forel are documented here. Format loosely follows
   user-visible change).
 - Rules with an invalid regex condition now show an error right in the
   editor and can't be saved, instead of silently never matching any file.
+- Fixed the update checker occasionally announcing an update that wasn't
+  actually downloadable yet, right after a new version was tagged.
 
 ## [0.1.0-beta.1] - 2026-06-17
 
