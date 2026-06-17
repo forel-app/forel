@@ -34,6 +34,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if warnAndQuitIfRunningFromDiskImage() {
+            return
+        }
+
         // Running as a bare dev executable (no packaged .app/Info.plist) shows
         // a generic Dock icon otherwise; set it explicitly from the bundled artwork.
         if let appIcon = AppIcons.appIcon {
@@ -47,6 +51,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if model != nil, updater != nil {
             setUpStatusBar()
         }
+    }
+
+    /// Opening Forel straight from the mounted installer disk image (before
+    /// dragging it to Applications) is the most common way a first launch
+    /// ends up somewhere macOS gates behind a permission prompt — `/Volumes`
+    /// is TCC-protected the same way Documents/Desktop/Downloads are, so
+    /// just starting up from there is enough to trigger it, regardless of
+    /// what Forel's own code does. It also breaks the self-updater, which
+    /// needs to write to wherever the app bundle lives. Catch it before any
+    /// of that runs and ask the user to move it first instead.
+    private func warnAndQuitIfRunningFromDiskImage() -> Bool {
+        guard Bundle.main.bundleURL.path.hasPrefix("/Volumes/") else { return false }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Move Forel to Applications first"
+        alert.informativeText = "Forel is running from the installer disk image. Drag Forel into your Applications folder, then open it from there."
+        alert.addButton(withTitle: "Quit")
+        alert.runModal()
+        NSApp.terminate(nil)
+        return true
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
