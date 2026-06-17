@@ -20,10 +20,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Swift
-        uses: swift-actions/setup-swift@v3
-        with:
-          swift-version: "6.0"
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          xcode_app="$(ls -1d /Applications/Xcode*.app | sort -V | tail -n 1)"
+          sudo xcode-select -switch "$xcode_app/Contents/Developer"
+          xcodebuild -version
+          swift --version
 
       - name: Build
         run: swift build
