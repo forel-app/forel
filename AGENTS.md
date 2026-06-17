@@ -59,6 +59,11 @@ swift test
 swift run ForelApp
 ```
 
+## Changelog
+
+- New entries always go under `## [Unreleased]` at the top of `CHANGELOG.md`, never directly under a version header. A version header is only created by renaming `[Unreleased]` when actually cutting that release.
+- Entries must be concise, precise, and user-facing: state what changed and the user-visible effect, no filler, no internal implementation detail (no file/function names, no "we").
+
 ## Notes for contributors
 
 - Keep the codebase macOS-only.

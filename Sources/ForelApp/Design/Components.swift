@@ -78,33 +78,45 @@ struct UpdateAvailableBanner: View {
     let action: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             ZStack {
                 Circle().fill(Color.white.opacity(0.22))
                 Image(systemName: "arrow.down.circle.fill")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
             }
-            .frame(width: 32, height: 32)
+            .frame(width: 26, height: 26)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text("Update available").font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
-                Text(version.map { "Version \($0) is ready to install" } ?? "A new version is ready to install")
-                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.85))
+                Text("Update available")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Text(version.map { "Version \($0)" } ?? "New version available")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            Spacer()
+            .layoutPriority(1)
+
+            Spacer(minLength: 6)
+
             Button(isInstalling ? "Installing…" : "Download", action: action)
                 .buttonStyle(.plain)
-                .font(.system(size: 12, weight: .bold))
+                .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(Color.orange)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
                 .background(Capsule().fill(.white))
                 .disabled(isInstalling)
                 .opacity(isInstalling ? 0.7 : 1)
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(LinearGradient(colors: [Color.orange, Color.orange.opacity(0.85)], startPoint: .topLeading, endPoint: .bottomTrailing))

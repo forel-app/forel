@@ -3,6 +3,12 @@
 All notable changes to Forel are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+- Fixed the "Update available" banner text getting cut off in the menu bar
+  panel.
+
 ## [0.1.0-beta.2] - 2026-06-17
 
 ### Fixed
