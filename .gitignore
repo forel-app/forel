@@ -16,3 +16,4 @@ dist/
 node_modules/
 .pnpm-store/
 .vite/
+.vscode
