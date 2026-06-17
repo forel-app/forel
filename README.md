@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="tauri/assets/forel-icon.png" alt="Forel" width="120" />
+<img src="assets/forel-icon.png" alt="Forel" width="120" />
 
 # Forel
 
@@ -121,9 +121,6 @@ forel/
 │   └── ForelCore/             # Rule engine, watcher, SQLite persistence, models
 ├── Tests/
 │   └── ForelCoreTests/        # Core engine and persistence tests
-└── tauri/                     # Archived Tauri + React implementation
-    ├── src/                   # Old frontend
-    └── src-tauri/             # Old Rust backend
 ```
 
 **Key technology choices:**
