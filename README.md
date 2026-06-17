@@ -16,7 +16,7 @@
 
 <br/>
 
-<img src="assets/app-screen-1.png" alt="Forel — main view" width="49%" /> <img src="assets/app-screen-2.png" alt="Forel — rule editor" width="49%" />
+<img src="assets/app-screen-new-1.png" alt="Forel — main view" width="49%" /> <img src="assets/app-screen-new-2.png" alt="Forel — rule editor" width="49%" />
 
 </div>
 
