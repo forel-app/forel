@@ -53,10 +53,42 @@ struct ToggleRow: View {
                 Text(subtitle).font(.system(size: 11)).foregroundStyle(ForelTheme.secondaryText)
             }
             Spacer()
-            Toggle("", isOn: $isOn).labelsHidden().toggleStyle(.switch).tint(ForelTheme.accent)
+            ForelSwitch(isOn: $isOn)
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 14)
+    }
+}
+
+struct ForelSwitch: View {
+    @Binding var isOn: Bool
+    var compact: Bool = false
+
+    private var width: CGFloat { compact ? 42 : 46 }
+    private var height: CGFloat { compact ? 23 : 25 }
+    private var knobSize: CGFloat { height - 5 }
+
+    var body: some View {
+        Button {
+            withAnimation(.snappy(duration: 0.16)) {
+                isOn.toggle()
+            }
+        } label: {
+            Capsule()
+                .fill(isOn ? ForelTheme.accent : ForelTheme.surfaceBorder.opacity(0.9))
+                .frame(width: width, height: height)
+                .overlay(alignment: isOn ? .trailing : .leading) {
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: knobSize, height: knobSize)
+                        .shadow(color: Color.black.opacity(0.25), radius: 1, y: 1)
+                        .padding(.horizontal, 3)
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Enabled")
+        .accessibilityValue(isOn ? "On" : "Off")
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -101,7 +133,7 @@ struct QuickFolderRow: View {
                 .lineLimit(1)
 
             Spacer()
-            Toggle("", isOn: $isOn).labelsHidden().toggleStyle(.switch).tint(ForelTheme.accent).controlSize(.small)
+            ForelSwitch(isOn: $isOn, compact: true)
         }
         .padding(.vertical, 7)
         .padding(.horizontal, 14)
@@ -234,11 +266,30 @@ struct BrandMark: View {
 struct ViewHeader<Trailing: View>: View {
     let title: String
     let subtitle: String
+    var systemImage: String?
     @ViewBuilder var trailing: Trailing
+
+    init(title: String, subtitle: String, systemImage: String? = nil, @ViewBuilder trailing: () -> Trailing) {
+        self.title = title
+        self.subtitle = subtitle
+        self.systemImage = systemImage
+        self.trailing = trailing()
+    }
 
     var body: some View {
         HStack(spacing: 10) {
-            BrandMark()
+            if let systemImage {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(ForelTheme.accent.opacity(0.18))
+                    Image(systemName: systemImage)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(ForelTheme.accent)
+                }
+                .frame(width: 34, height: 34)
+            } else {
+                BrandMark()
+            }
             VStack(alignment: .leading, spacing: 1) {
                 Text(title).font(.system(size: 15, weight: .bold)).foregroundStyle(ForelTheme.primaryText)
                 Text(subtitle).font(.system(size: 11)).foregroundStyle(ForelTheme.secondaryText)
@@ -250,8 +301,8 @@ struct ViewHeader<Trailing: View>: View {
 }
 
 extension ViewHeader where Trailing == EmptyView {
-    init(title: String, subtitle: String) {
-        self.init(title: title, subtitle: subtitle) { EmptyView() }
+    init(title: String, subtitle: String, systemImage: String? = nil) {
+        self.init(title: title, subtitle: subtitle, systemImage: systemImage) { EmptyView() }
     }
 }
 

@@ -72,11 +72,7 @@ struct SidebarView: View {
 
             Spacer(minLength: 4)
 
-            Toggle("", isOn: enabledBinding(folder))
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .tint(ForelTheme.accent)
-                .controlSize(.small)
+            ForelSwitch(isOn: enabledBinding(folder), compact: true)
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 10)

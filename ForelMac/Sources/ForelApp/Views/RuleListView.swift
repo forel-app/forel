@@ -63,7 +63,8 @@ struct RuleListView: View {
             title: selectedFolder.map { ($0.path as NSString).lastPathComponent } ?? "Rules",
             subtitle: model.selectedFolderId == nil
                 ? "Select a folder to manage its rules"
-                : "\(model.rules.count) rule\(model.rules.count == 1 ? "" : "s") · drag to reorder"
+                : "\(model.rules.count) rule\(model.rules.count == 1 ? "" : "s") · drag to reorder",
+            systemImage: selectedFolder == nil ? nil : "folder.fill"
         ) {
             Button {
                 model.reloadHistory()

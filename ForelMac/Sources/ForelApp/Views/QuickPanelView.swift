@@ -59,7 +59,10 @@ struct QuickPanelView: View {
         .padding(16)
         .frame(width: 320)
         .background(ForelTheme.background)
-        .onAppear { model.reloadHistory() }
+        .onAppear {
+            model.reloadFolders()
+            model.reloadHistory()
+        }
     }
 
     private var header: some View {
@@ -69,10 +72,19 @@ struct QuickPanelView: View {
     }
 
     private var watchingBinding: Binding<Bool> {
-        Binding(get: { !model.paused }, set: { _ in model.togglePaused() })
+        Binding(get: { !model.paused }, set: { enabled in
+            if enabled == model.paused {
+                model.togglePaused()
+            }
+        })
     }
 
     private func folderBinding(_ folder: WatchedFolder) -> Binding<Bool> {
-        Binding(get: { folder.enabled }, set: { model.toggleFolder(folder, enabled: $0) })
+        Binding(
+            get: {
+                model.folders.first { $0.id == folder.id }?.enabled ?? folder.enabled
+            },
+            set: { model.toggleFolder(folder, enabled: $0) }
+        )
     }
 }

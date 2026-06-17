@@ -13,20 +13,20 @@ struct RuleEditorView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 18) {
             ViewHeader(
                 title: rule.name.isEmpty ? "New Rule" : "Edit Rule",
                 subtitle: "Conditions decide which files match; actions decide what happens"
             )
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 18) {
                     SectionLabel(title: "Basics")
                     GlassCard {
-                        VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 14) {
                             GlassField(placeholder: "Rule name", text: $rule.name)
 
-                            HStack {
+                            HStack(spacing: 16) {
                                 Text("Scope").font(.system(size: 12)).foregroundStyle(ForelTheme.secondaryText)
                                 Spacer()
                                 Picker("", selection: scopeBinding) {
@@ -36,7 +36,7 @@ struct RuleEditorView: View {
                                 }
                                 .labelsHidden()
                                 .pickerStyle(.segmented)
-                                .frame(width: 260)
+                                .frame(width: 320)
                             }
 
                             Picker("", selection: $rule.conditionMatch) {
@@ -46,7 +46,7 @@ struct RuleEditorView: View {
                             .labelsHidden()
                             .pickerStyle(.segmented)
                         }
-                        .padding(14)
+                        .padding(18)
                     }
 
                     HStack {
@@ -60,7 +60,7 @@ struct RuleEditorView: View {
                         .buttonStyle(IconButtonStyle())
                     }
                     GlassCard {
-                        VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 12) {
                             if rule.conditions.isEmpty {
                                 placeholder("No conditions — this rule matches every file in scope.")
                             }
@@ -70,7 +70,7 @@ struct RuleEditorView: View {
                                 }
                             }
                         }
-                        .padding(14)
+                        .padding(18)
                     }
 
                     HStack {
@@ -84,7 +84,7 @@ struct RuleEditorView: View {
                         .buttonStyle(IconButtonStyle())
                     }
                     GlassCard {
-                        VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 12) {
                             if rule.actions.isEmpty {
                                 placeholder("No actions yet — add at least one to make this rule do something.")
                             }
@@ -94,7 +94,7 @@ struct RuleEditorView: View {
                                 }
                             }
                         }
-                        .padding(14)
+                        .padding(18)
                     }
                 }
             }
@@ -116,8 +116,8 @@ struct RuleEditorView: View {
                     .disabled(rule.name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
-        .padding(16)
-        .frame(width: 600, height: 620)
+        .padding(22)
+        .frame(width: 760, height: 680)
         .background(ForelTheme.background)
     }
 
@@ -138,14 +138,14 @@ private struct ConditionRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 12) {
             Picker("", selection: $condition.kind) {
                 ForEach(ConditionEditorLabels.kinds, id: \.0) { kind, label in
                     Text(label).tag(kind)
                 }
             }
             .labelsHidden()
-            .frame(width: 130)
+            .frame(width: 160)
 
             Picker("", selection: $condition.operator) {
                 ForEach(ConditionEditorLabels.operators, id: \.0) { op, label in
@@ -153,7 +153,7 @@ private struct ConditionRow: View {
                 }
             }
             .labelsHidden()
-            .frame(width: 140)
+            .frame(width: 170)
 
             if condition.kind == .colorLabel {
                 ColorLabelPicker(selection: $condition.value, allowNone: false)
@@ -174,15 +174,15 @@ private struct ActionRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
                 Picker("", selection: kindBinding) {
                     ForEach(ConditionEditorLabels.actionKinds, id: \.0) { kind, label in
                         Text(label).tag(kind)
                     }
                 }
                 .labelsHidden()
-                .frame(width: 160)
+                .frame(width: 190)
 
                 Spacer()
 
@@ -209,7 +209,7 @@ private struct ActionRow: View {
                     .foregroundStyle(ForelTheme.secondaryText)
             }
         }
-        .padding(10)
+        .padding(14)
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(ForelTheme.surface))
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(ForelTheme.surfaceBorder))
     }
