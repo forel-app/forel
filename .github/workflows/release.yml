@@ -98,4 +98,5 @@ jobs:
         with:
           files: dist/release/*.dmg
           prerelease: false
+          make_latest: true
           body: ${{ steps.notes.outputs.BODY }}

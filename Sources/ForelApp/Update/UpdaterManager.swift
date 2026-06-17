@@ -27,11 +27,15 @@ final class UpdaterManager: ObservableObject {
         let tagName: String
         let htmlUrl: URL
         let assets: [Asset]
+        let draft: Bool
+        let prerelease: Bool
 
         enum CodingKeys: String, CodingKey {
             case tagName = "tag_name"
             case htmlUrl = "html_url"
             case assets
+            case draft
+            case prerelease
         }
     }
 
@@ -94,7 +98,7 @@ final class UpdaterManager: ObservableObject {
             defer { isChecking = false }
             guard let release = await Self.fetchLatestRelease() else { return }
             let current = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
-            let latest = release.tagName.hasPrefix("v") ? String(release.tagName.dropFirst()) : release.tagName
+            let latest = Self.version(of: release)
             if Self.isNewer(latest, than: current) {
                 updateAvailable = true
                 latestVersion = latest
@@ -145,27 +149,85 @@ final class UpdaterManager: ObservableObject {
         }
     }
 
+    /// Fetches the actual highest-versioned release rather than trusting
+    /// GitHub's `/releases/latest`, whose "latest" flag is set at publish
+    /// time and can lag behind (e.g. a beta published after an alpha that
+    /// never got re-flagged as latest) — comparing every release ourselves
+    /// can't go stale that way.
     private static func fetchLatestRelease() async -> GitHubRelease? {
-        guard let url = URL(string: "https://api.github.com/repos/\(repo)/releases/latest") else { return nil }
+        guard let url = URL(string: "https://api.github.com/repos/\(repo)/releases?per_page=20") else { return nil }
         var request = URLRequest(url: url)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         guard let (data, response) = try? await URLSession.shared.data(for: request),
-              let http = response as? HTTPURLResponse, http.statusCode == 200 else { return nil }
-        return try? JSONDecoder().decode(GitHubRelease.self, from: data)
+              let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let releases = try? JSONDecoder().decode([GitHubRelease].self, from: data) else { return nil }
+        return releases
+            .filter { !$0.draft && !$0.prerelease }
+            .max { lhs, rhs in compareVersions(version(of: lhs), version(of: rhs)) == .orderedAscending }
     }
 
-    /// Compares dot-separated numeric version strings (e.g. "1.2.10" vs "1.2.3").
-    /// Missing components are treated as 0, non-numeric components as 0.
+    private static func version(of release: GitHubRelease) -> String {
+        release.tagName.hasPrefix("v") ? String(release.tagName.dropFirst()) : release.tagName
+    }
+
     static func isNewer(_ candidate: String, than current: String) -> Bool {
-        let candidateParts = candidate.split(separator: ".").map { Int($0) ?? 0 }
-        let currentParts = current.split(separator: ".").map { Int($0) ?? 0 }
-        let count = max(candidateParts.count, currentParts.count)
-        for index in 0..<count {
-            let candidatePart = index < candidateParts.count ? candidateParts[index] : 0
-            let currentPart = index < currentParts.count ? currentParts[index] : 0
-            if candidatePart != currentPart { return candidatePart > currentPart }
+        compareVersions(candidate, current) == .orderedDescending
+    }
+
+    /// Semver-ish comparison: numeric `major.minor.patch` core, then a
+    /// stable release outranks any prerelease, and prereleases compare
+    /// their dot-separated identifiers left to right (numeric identifiers
+    /// numerically, others lexically — which conveniently also gives the
+    /// right "alpha" < "beta" < "rc" ordering). This matters because the
+    /// naive "split on every dot and compare as numbers" approach used
+    /// before this would parse "alpha.8" and "beta.1" as the *same* leading
+    /// components and then compare 8 vs 1, concluding alpha.8 > beta.1.
+    static func compareVersions(_ lhs: String, _ rhs: String) -> ComparisonResult {
+        let (lhsCore, lhsPre) = splitVersion(lhs)
+        let (rhsCore, rhsPre) = splitVersion(rhs)
+        let coreResult = compareCore(lhsCore, rhsCore)
+        guard coreResult == .orderedSame else { return coreResult }
+        switch (lhsPre, rhsPre) {
+        case (nil, nil): return .orderedSame
+        case (nil, _): return .orderedDescending
+        case (_, nil): return .orderedAscending
+        case let (lhsId?, rhsId?): return comparePrerelease(lhsId, rhsId)
         }
-        return false
+    }
+
+    private static func splitVersion(_ version: String) -> (core: [Int], prerelease: String?) {
+        let parts = version.split(separator: "-", maxSplits: 1)
+        let core = parts[0].split(separator: ".").map { Int($0) ?? 0 }
+        let prerelease = parts.count > 1 ? String(parts[1]) : nil
+        return (core, prerelease)
+    }
+
+    private static func compareCore(_ lhs: [Int], _ rhs: [Int]) -> ComparisonResult {
+        let count = max(lhs.count, rhs.count)
+        for index in 0..<count {
+            let lhsPart = index < lhs.count ? lhs[index] : 0
+            let rhsPart = index < rhs.count ? rhs[index] : 0
+            if lhsPart != rhsPart { return lhsPart < rhsPart ? .orderedAscending : .orderedDescending }
+        }
+        return .orderedSame
+    }
+
+    private static func comparePrerelease(_ lhs: String, _ rhs: String) -> ComparisonResult {
+        let lhsIds = lhs.split(separator: ".").map(String.init)
+        let rhsIds = rhs.split(separator: ".").map(String.init)
+        let count = max(lhsIds.count, rhsIds.count)
+        for index in 0..<count {
+            guard index < lhsIds.count else { return .orderedAscending }
+            guard index < rhsIds.count else { return .orderedDescending }
+            let lhsId = lhsIds[index]
+            let rhsId = rhsIds[index]
+            if let lhsNumber = Int(lhsId), let rhsNumber = Int(rhsId) {
+                if lhsNumber != rhsNumber { return lhsNumber < rhsNumber ? .orderedAscending : .orderedDescending }
+            } else if lhsId != rhsId {
+                return lhsId < rhsId ? .orderedAscending : .orderedDescending
+            }
+        }
+        return .orderedSame
     }
 
     private static func download(_ assetURL: URL) async throws -> URL {
