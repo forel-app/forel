@@ -52,28 +52,50 @@ jobs:
     needs: build
     runs-on: macos-14
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download release artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist/release
           merge-multiple: true
 
+      - name: Release notes from CHANGELOG
+        id: notes
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          if ! grep -Fq "## [$VERSION]" CHANGELOG.md; then
+            echo "CHANGELOG.md has no entry for $VERSION" >&2
+            exit 1
+          fi
+          NOTES="$(awk -v hdr="## [$VERSION]" 'index($0,hdr)==1{g=1;next} /^## \[/&&g{exit} g{print}' CHANGELOG.md)"
+          if [[ -z "${NOTES//[[:space:]]/}" ]]; then
+            echo "CHANGELOG.md entry for $VERSION is empty" >&2
+            exit 1
+          fi
+          {
+            echo "BODY<<__FOREL_EOF__"
+            echo "## Forel ${{ github.ref_name }}"
+            echo ""
+            printf '%s\n' "$NOTES"
+            echo ""
+            echo "Two builds available. Download the one that matches your Mac:"
+            echo "- \`Forel-${{ github.ref_name }}-darwin-arm64.dmg\` Apple Silicon (M1 / M2 / M3 / M4)"
+            echo "- \`Forel-${{ github.ref_name }}-darwin-x86_64.dmg\` for Intel"
+            echo ""
+            echo "Requires **macOS 14 Sonoma or later**."
+            echo ""
+            echo "1. Download the correct .dmg for your Mac."
+            echo "2. Open it and drag **Forel** into **Applications**."
+            echo "3. First launch: the app is ad-hoc signed (not notarized), so right-click **Forel.app -> Open** and confirm. (Or run \`xattr -cr /Applications/Forel.app\`.)"
+            echo "__FOREL_EOF__"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/release/*.dmg
-          generate_release_notes: true
           prerelease: false
-          body: |
-            ## Forel ${{ github.ref_name }}
-
-            Two builds available. Download the one that matches your Mac:
-            - `Forel-${{ github.ref_name }}-darwin-arm64.dmg` Apple Silicon (M1 / M2 / M3 / M4)
-            - `Forel-${{ github.ref_name }}-darwin-x86_64.dmg` for Intel
-
-            Requires **macOS 14 Sonoma or later**.
-
-            1. Download the correct .dmg for your Mac.
-            2. Open it and drag **Forel** into **Applications**.
-            3. First launch: the app is ad-hoc signed (not notarized), so right-click
-               **Forel.app -> Open** and confirm. (Or run `xattr -cr /Applications/Forel.app`.)
+          body: ${{ steps.notes.outputs.BODY }}
