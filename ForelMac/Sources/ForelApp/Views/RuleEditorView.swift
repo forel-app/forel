@@ -120,16 +120,25 @@ struct RuleEditorView: View {
 
 private struct ScopeEditor: View {
     @Binding var depth: Int64?
-    @State private var subfolderDepthText = "1"
+    @State private var lastExplicitDepth: Int64 = 1
+
+    init(depth: Binding<Int64?>) {
+        _depth = depth
+        let initialDepth = depth.wrappedValue ?? 1
+        _lastExplicitDepth = State(initialValue: max(1, initialDepth))
+    }
 
     private var modeBinding: Binding<Int> {
         Binding(
             get: { depth == 0 ? 0 : 1 },
             set: { mode in
                 if mode == 0 {
+                    if let depth, depth > 0 {
+                        lastExplicitDepth = depth
+                    }
                     depth = 0
                 } else if depth == 0 {
-                    depth = Int64(subfolderDepthText) ?? 1
+                    depth = lastExplicitDepth
                 }
             }
         )
@@ -139,7 +148,14 @@ private struct ScopeEditor: View {
         Binding(
             get: { depth == nil },
             set: { allLevels in
-                depth = allLevels ? nil : Int64(subfolderDepthText) ?? 1
+                if allLevels {
+                    if let depth, depth > 0 {
+                        lastExplicitDepth = depth
+                    }
+                    depth = nil
+                } else {
+                    depth = lastExplicitDepth
+                }
             }
         )
     }
@@ -183,12 +199,12 @@ private struct ScopeEditor: View {
                 if let depth {
                     return "\(max(1, depth))"
                 }
-                return subfolderDepthText
+                return "\(lastExplicitDepth)"
             },
             set: { value in
                 let filtered = value.filter(\.isNumber)
-                subfolderDepthText = filtered.isEmpty ? "1" : filtered
-                depth = Int64(subfolderDepthText) ?? 1
+                lastExplicitDepth = max(1, Int64(filtered) ?? 1)
+                depth = lastExplicitDepth
             }
         )
     }
@@ -268,9 +284,13 @@ private struct ConditionRow: View {
         Binding(
             get: { condition.operator },
             set: { newOperator in
+                let oldOperator = condition.operator
                 condition.operator = newOperator
-                if condition.kind.isDateKind, newOperator.isRelativeDateOperator, condition.value.trimmingCharacters(in: .whitespaces).isEmpty {
-                    condition.value = "7 days"
+                if condition.kind.isDateKind {
+                    let changedValueFormat = oldOperator.isRelativeDateOperator != newOperator.isRelativeDateOperator
+                    if changedValueFormat || condition.value.trimmingCharacters(in: .whitespaces).isEmpty {
+                        condition.value = newOperator.isRelativeDateOperator ? "7 days" : ""
+                    }
                 }
                 if condition.kind == .sizeBytes, condition.value.trimmingCharacters(in: .whitespaces).isEmpty {
                     condition.value = "0 bytes"
