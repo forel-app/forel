@@ -25,19 +25,7 @@ struct RuleEditorView: View {
                     GlassCard {
                         VStack(alignment: .leading, spacing: 14) {
                             GlassField(placeholder: "Rule name", text: $rule.name)
-
-                            HStack(spacing: 16) {
-                                Text("Scope").font(.system(size: 12)).foregroundStyle(ForelTheme.secondaryText)
-                                Spacer()
-                                Picker("", selection: scopeBinding) {
-                                    Text("This folder").tag(0 as Int64?)
-                                    Text("1 level").tag(1 as Int64?)
-                                    Text("All subfolders").tag(nil as Int64?)
-                                }
-                                .labelsHidden()
-                                .pickerStyle(.segmented)
-                                .frame(width: 320)
-                            }
+                            ScopeEditor(depth: $rule.recursionDepth)
 
                             Picker("", selection: $rule.conditionMatch) {
                                 Text("Match all conditions").tag(ConditionMatch.all)
@@ -128,8 +116,87 @@ struct RuleEditorView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var scopeBinding: Binding<Int64?> {
-        Binding(get: { rule.recursionDepth }, set: { rule.recursionDepth = $0 })
+}
+
+private struct ScopeEditor: View {
+    @Binding var depth: Int64?
+    @State private var subfolderDepthText = "1"
+
+    private var modeBinding: Binding<Int> {
+        Binding(
+            get: { depth == 0 ? 0 : 1 },
+            set: { mode in
+                if mode == 0 {
+                    depth = 0
+                } else if depth == 0 {
+                    depth = Int64(subfolderDepthText) ?? 1
+                }
+            }
+        )
+    }
+
+    private var allLevelsBinding: Binding<Bool> {
+        Binding(
+            get: { depth == nil },
+            set: { allLevels in
+                depth = allLevels ? nil : Int64(subfolderDepthText) ?? 1
+            }
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 16) {
+                Text("Scope").font(.system(size: 12)).foregroundStyle(ForelTheme.secondaryText)
+                Spacer()
+                Picker("", selection: modeBinding) {
+                    Text("Current folder").tag(0)
+                    Text("Subfolders").tag(1)
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 260)
+            }
+
+            if depth != 0 {
+                HStack(spacing: 10) {
+                    Text("Depth").font(.system(size: 12)).foregroundStyle(ForelTheme.secondaryText)
+                    GlassField(placeholder: "1", text: depthTextBinding)
+                        .frame(width: 72)
+                        .disabled(depth == nil)
+                    Toggle("All levels", isOn: allLevelsBinding)
+                        .toggleStyle(.checkbox)
+                        .font(.system(size: 12))
+                        .foregroundStyle(ForelTheme.primaryText)
+                    Text(scopeSummary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(ForelTheme.secondaryText)
+                    Spacer()
+                }
+            }
+        }
+    }
+
+    private var depthTextBinding: Binding<String> {
+        Binding(
+            get: {
+                if let depth {
+                    return "\(max(1, depth))"
+                }
+                return subfolderDepthText
+            },
+            set: { value in
+                let filtered = value.filter(\.isNumber)
+                subfolderDepthText = filtered.isEmpty ? "1" : filtered
+                depth = Int64(subfolderDepthText) ?? 1
+            }
+        )
+    }
+
+    private var scopeSummary: String {
+        guard let depth else { return "All subfolder levels" }
+        let safeDepth = max(1, depth)
+        return "\(safeDepth) subfolder level\(safeDepth == 1 ? "" : "s")"
     }
 }
 
@@ -138,8 +205,8 @@ private struct ConditionRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            Picker("", selection: $condition.kind) {
+        HStack(alignment: .center, spacing: 12) {
+            Picker("", selection: kindBinding) {
                 ForEach(ConditionEditorLabels.kinds, id: \.0) { kind, label in
                     Text(label).tag(kind)
                 }
@@ -147,25 +214,182 @@ private struct ConditionRow: View {
             .labelsHidden()
             .frame(width: 160)
 
-            Picker("", selection: $condition.operator) {
-                ForEach(ConditionEditorLabels.operators, id: \.0) { op, label in
+            Picker("", selection: operatorBinding) {
+                ForEach(ConditionEditorLabels.operators(for: condition.kind), id: \.0) { op, label in
                     Text(label).tag(op)
                 }
             }
             .labelsHidden()
             .frame(width: 170)
 
-            if condition.kind == .colorLabel {
-                ColorLabelPicker(selection: $condition.value, allowNone: false)
-            } else {
-                GlassField(placeholder: "Value", text: $condition.value)
-            }
+            conditionValue
+                .frame(width: 300, alignment: .leading)
+                .frame(minHeight: 32)
 
             Button(role: .destructive, action: onDelete) {
                 Image(systemName: "minus")
             }
             .buttonStyle(IconButtonStyle(role: .destructive))
+            .frame(width: 28)
         }
+    }
+
+    @ViewBuilder private var conditionValue: some View {
+        if condition.kind == .colorLabel {
+            ColorLabelPicker(selection: $condition.value, allowNone: false)
+        } else if condition.kind == .kind {
+            KindValuePicker(value: $condition.value)
+        } else if condition.kind == .sizeBytes {
+            SizeValueEditor(value: $condition.value)
+        } else if condition.kind.isDateKind && condition.operator.isRelativeDateOperator {
+            RelativeDateValueEditor(value: $condition.value)
+        } else if condition.kind.isDateKind {
+            GlassField(placeholder: "YYYY-MM-DD", text: $condition.value)
+        } else {
+            GlassField(placeholder: "Value", text: $condition.value)
+        }
+    }
+
+    private var kindBinding: Binding<ConditionKind> {
+        Binding(
+            get: { condition.kind },
+            set: { newKind in
+                condition.kind = newKind
+                let operators = ConditionEditorLabels.operators(for: newKind).map(\.0)
+                if !operators.contains(condition.operator) {
+                    condition.operator = ConditionEditorLabels.defaultOperator(for: newKind)
+                }
+                condition.value = defaultValue(for: newKind, operator_: condition.operator)
+            }
+        )
+    }
+
+    private var operatorBinding: Binding<Operator> {
+        Binding(
+            get: { condition.operator },
+            set: { newOperator in
+                condition.operator = newOperator
+                if condition.kind.isDateKind, newOperator.isRelativeDateOperator, condition.value.trimmingCharacters(in: .whitespaces).isEmpty {
+                    condition.value = "7 days"
+                }
+                if condition.kind == .sizeBytes, condition.value.trimmingCharacters(in: .whitespaces).isEmpty {
+                    condition.value = "0 bytes"
+                }
+            }
+        )
+    }
+
+    private func defaultValue(for kind: ConditionKind, operator_: Operator) -> String {
+        if kind == .kind { return "image" }
+        if kind == .sizeBytes { return "0 bytes" }
+        if kind.isDateKind {
+            return operator_.isRelativeDateOperator ? "7 days" : ""
+        }
+        return ""
+    }
+}
+
+private struct RelativeDateValueEditor: View {
+    @Binding var value: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            GlassField(placeholder: "7", text: numberBinding)
+                .frame(width: 72)
+            Picker("", selection: unitBinding) {
+                ForEach(["days", "weeks", "months", "years"], id: \.self) { unit in
+                    Text(unit).tag(unit)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 120)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var numberBinding: Binding<String> {
+        Binding(
+            get: { parts.number },
+            set: { value = "\($0.filter(\.isNumber)) \(parts.unit)" }
+        )
+    }
+
+    private var unitBinding: Binding<String> {
+        Binding(
+            get: { parts.unit },
+            set: { value = "\(parts.number) \($0)" }
+        )
+    }
+
+    private var parts: (number: String, unit: String) {
+        let pieces = value.split(separator: " ", maxSplits: 1).map(String.init)
+        let number = pieces.first?.filter(\.isNumber)
+        let unit = pieces.count > 1 ? pieces[1] : "days"
+        return ((number?.isEmpty == false ? number! : "7"), ["days", "weeks", "months", "years"].contains(unit) ? unit : "days")
+    }
+}
+
+private struct SizeValueEditor: View {
+    @Binding var value: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            GlassField(placeholder: "0", text: numberBinding)
+                .frame(width: 90)
+            Picker("", selection: unitBinding) {
+                ForEach(["bytes", "KB", "MB", "GB"], id: \.self) { unit in
+                    Text(unit).tag(unit)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 110)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var numberBinding: Binding<String> {
+        Binding(
+            get: { parts.number },
+            set: { value = "\($0.filter { $0.isNumber || $0 == "." }) \(parts.unit)" }
+        )
+    }
+
+    private var unitBinding: Binding<String> {
+        Binding(
+            get: { parts.unit },
+            set: { value = "\(parts.number) \($0)" }
+        )
+    }
+
+    private var parts: (number: String, unit: String) {
+        let pieces = value.split(separator: " ", maxSplits: 1).map(String.init)
+        let number = pieces.first?.filter { $0.isNumber || $0 == "." }
+        let rawUnit = pieces.count > 1 ? pieces[1] : "bytes"
+        let unit = ["bytes", "KB", "MB", "GB"].contains(rawUnit) ? rawUnit : "bytes"
+        return ((number?.isEmpty == false ? number! : "0"), unit)
+    }
+}
+
+private struct KindValuePicker: View {
+    @Binding var value: String
+
+    var body: some View {
+        Picker("", selection: valueBinding) {
+            ForEach(ConditionEditorLabels.fileKinds, id: \.0) { value, label in
+                Text(label).tag(value)
+            }
+        }
+        .labelsHidden()
+        .frame(width: 180, alignment: .leading)
+    }
+
+    private var valueBinding: Binding<String> {
+        Binding(
+            get: {
+                ConditionEditorLabels.fileKinds.contains { $0.0 == value } ? value : "image"
+            },
+            set: { value = $0 }
+        )
     }
 }
 
@@ -174,44 +398,48 @@ private struct ActionRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                Picker("", selection: kindBinding) {
-                    ForEach(ConditionEditorLabels.actionKinds, id: \.0) { kind, label in
-                        Text(label).tag(kind)
-                    }
+        HStack(alignment: .center, spacing: 12) {
+            Picker("", selection: kindBinding) {
+                ForEach(ConditionEditorLabels.actionKinds, id: \.0) { kind, label in
+                    Text(label).tag(kind)
                 }
-                .labelsHidden()
-                .frame(width: 190)
-
-                Spacer()
-
-                Button(role: .destructive, action: onDelete) {
-                    Image(systemName: "minus")
-                }
-                .buttonStyle(IconButtonStyle(role: .destructive))
             }
+            .labelsHidden()
+            .frame(width: 190)
 
-            switch action.kind {
-            case .moveToFolder, .copyToFolder:
-                FolderField(placeholder: "Destination folder", path: paramBinding("destination"))
-            case .rename:
-                GlassField(placeholder: "Pattern, e.g. {name}-{current_date}.{extension}", text: paramBinding("pattern"))
-            case .addTag, .removeTag:
-                GlassField(placeholder: "Tag", text: paramBinding("tag"))
-            case .setColorLabel:
-                ColorLabelPicker(selection: paramBinding("color"), allowNone: true)
-            case .runScript:
-                GlassField(placeholder: "Bash script (file path in $FOREL_FILE)", text: paramBinding("script"))
-            case .moveToTrash, .delete:
-                Text("No parameters")
-                    .font(.system(size: 11))
-                    .foregroundStyle(ForelTheme.secondaryText)
+            actionParams
+                .frame(width: 420, alignment: .leading)
+                .frame(minHeight: 32)
+
+            Button(role: .destructive, action: onDelete) {
+                Image(systemName: "minus")
             }
+            .buttonStyle(IconButtonStyle(role: .destructive))
+            .frame(width: 28)
         }
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(ForelTheme.surface))
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(ForelTheme.surfaceBorder))
+    }
+
+    @ViewBuilder private var actionParams: some View {
+        switch action.kind {
+        case .moveToFolder, .copyToFolder:
+            FolderField(placeholder: "Destination folder", path: paramBinding("destination"))
+        case .rename:
+            GlassField(placeholder: "Pattern, e.g. {name}-{current_date}.{extension}", text: paramBinding("pattern"))
+        case .addTag, .removeTag:
+            GlassField(placeholder: "Tag", text: paramBinding("tag"))
+        case .setColorLabel:
+            ColorLabelPicker(selection: paramBinding("color"), allowNone: true)
+        case .runScript:
+            GlassField(placeholder: "Bash script (file path in $FOREL_FILE)", text: paramBinding("script"))
+        case .moveToTrash, .delete:
+            Text("No parameters")
+                .font(.system(size: 11))
+                .foregroundStyle(ForelTheme.secondaryText)
+                .frame(minHeight: 32, alignment: .center)
+        }
     }
 
     private var kindBinding: Binding<ActionKind> {
@@ -243,11 +471,44 @@ enum ConditionEditorLabels {
         (.createdAt, "Date created"), (.dateModified, "Date modified"), (.dateAdded, "Date added"),
     ]
 
-    static let operators: [(Operator, String)] = [
+    private static let allOperators: [(Operator, String)] = [
         (.is, "is"), (.isNot, "is not"), (.contains, "contains"), (.doesNotContain, "does not contain"),
         (.startsWith, "starts with"), (.endsWith, "ends with"), (.matchesRegex, "matches regex"),
         (.greaterThan, "greater than"), (.lessThan, "less than"), (.before, "is before"),
         (.after, "is after"), (.olderThan, "is older than"), (.withinLast, "is within the last"),
+    ]
+
+    static func operators(for kind: ConditionKind) -> [(Operator, String)] {
+        switch kind {
+        case .createdAt, .dateModified, .dateAdded:
+            return allOperators.filter { [.before, .after, .olderThan, .withinLast].contains($0.0) }
+        case .sizeBytes:
+            return allOperators.filter { [.is, .isNot, .greaterThan, .lessThan].contains($0.0) }
+        case .kind:
+            return allOperators.filter { [.is, .isNot].contains($0.0) }
+        case .colorLabel:
+            return allOperators.filter { [.is, .isNot].contains($0.0) }
+        default:
+            return allOperators.filter { [.is, .isNot, .contains, .doesNotContain, .startsWith, .endsWith, .matchesRegex].contains($0.0) }
+        }
+    }
+
+    static func defaultOperator(for kind: ConditionKind) -> Operator {
+        kind.isDateKind ? .withinLast : operators(for: kind).first?.0 ?? .is
+    }
+
+    static let fileKinds: [(String, String)] = [
+        ("image", "Image"),
+        ("movie", "Movie"),
+        ("music", "Music"),
+        ("pdf", "PDF"),
+        ("text", "Text"),
+        ("document", "Document"),
+        ("presentation", "Presentation"),
+        ("archive", "Archive"),
+        ("disk_image", "Disk Image"),
+        ("folder", "Folder"),
+        ("application", "Application"),
     ]
 
     static let actionKinds: [(ActionKind, String)] = [
@@ -255,4 +516,16 @@ enum ConditionEditorLabels {
         (.moveToTrash, "Move to Trash"), (.delete, "Delete"), (.addTag, "Add tag"),
         (.removeTag, "Remove tag"), (.setColorLabel, "Set color label"), (.runScript, "Run script"),
     ]
+}
+
+private extension ConditionKind {
+    var isDateKind: Bool {
+        self == .createdAt || self == .dateModified || self == .dateAdded
+    }
+}
+
+private extension Operator {
+    var isRelativeDateOperator: Bool {
+        self == .olderThan || self == .withinLast
+    }
 }
