@@ -3,7 +3,6 @@ import ForelCore
 
 struct RuleListView: View {
     @EnvironmentObject var model: AppModel
-    @Binding var showHistory: Bool
     @State private var editingRule: Rule?
     @State private var previewResult: PreviewResult?
 
@@ -68,7 +67,7 @@ struct RuleListView: View {
         ) {
             Button {
                 model.reloadHistory()
-                showHistory = true
+                model.detailRoute = .history
             } label: {
                 Image(systemName: "clock.arrow.circlepath")
             }

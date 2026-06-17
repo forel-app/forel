@@ -23,11 +23,5 @@ struct ForelMacApp: App {
         }
         .windowResizability(.contentSize)
         .defaultSize(width: 900, height: 620)
-
-        Settings {
-            SettingsView()
-                .environmentObject(model)
-                .environmentObject(updater)
-        }
     }
 }

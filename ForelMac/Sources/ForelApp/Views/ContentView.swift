@@ -3,7 +3,6 @@ import ForelCore
 
 struct ContentView: View {
     @EnvironmentObject var model: AppModel
-    @State private var showHistory = false
 
     var body: some View {
         NavigationSplitView {
@@ -11,10 +10,13 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 250, ideal: 270, max: 320)
                 .toolbar(removing: .sidebarToggle)
         } detail: {
-            if showHistory {
-                HistoryView(showHistory: $showHistory)
-            } else {
-                RuleListView(showHistory: $showHistory)
+            switch model.detailRoute {
+            case .rules:
+                RuleListView()
+            case .history:
+                HistoryView()
+            case .settings:
+                SettingsView()
             }
         }
         .toolbarBackground(ForelTheme.background, for: .windowToolbar)
@@ -25,6 +27,9 @@ struct ContentView: View {
         }
         .preferredColorScheme(.dark)
         .tint(ForelTheme.accent)
+        // ForelTheme.accent is a plain static var, not observable; bumping the
+        // identity here forces every descendant to rebuild and re-read it.
+        .id(model.accentVersion)
     }
 
     private var errorBinding: Binding<Bool> {

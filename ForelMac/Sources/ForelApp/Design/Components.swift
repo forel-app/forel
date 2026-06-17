@@ -172,6 +172,41 @@ struct FooterLink: View {
     }
 }
 
+/// Swatch picker for the app's accent colour presets, used in Settings.
+struct AccentColorPicker: View {
+    @Binding var selection: AccentPreset
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ForEach(AccentPreset.allCases) { preset in
+                swatch(preset)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func swatch(_ preset: AccentPreset) -> some View {
+        let isSelected = selection == preset
+        return Button {
+            selection = preset
+        } label: {
+            Circle()
+                .fill(preset.color)
+                .frame(width: 22, height: 22)
+                .overlay {
+                    if isSelected {
+                        Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(.white)
+                    }
+                }
+                .overlay {
+                    Circle().strokeBorder(isSelected ? Color.white : ForelTheme.surfaceBorder, lineWidth: isSelected ? 2 : 1)
+                }
+        }
+        .buttonStyle(.plain)
+        .help(preset.name)
+    }
+}
+
 // MARK: - Shared brand mark
 
 /// The small rounded Forel logo tile reused across the panel, settings and

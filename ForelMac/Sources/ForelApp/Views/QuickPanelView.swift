@@ -8,7 +8,6 @@ import ForelCore
 struct QuickPanelView: View {
     @EnvironmentObject var model: AppModel
     let onOpenMainWindow: () -> Void
-    let onCheckForUpdates: () -> Void
     let onQuit: () -> Void
 
     var body: some View {
@@ -49,7 +48,10 @@ struct QuickPanelView: View {
             HStack {
                 FooterLink(title: "Open Forel", systemImage: "arrow.up.forward.app", action: onOpenMainWindow)
                 Spacer()
-                FooterLink(title: "Check for Updates", systemImage: "arrow.triangle.2.circlepath", action: onCheckForUpdates)
+                FooterLink(title: "Settings", systemImage: "gearshape") {
+                    model.detailRoute = .settings
+                    onOpenMainWindow()
+                }
                 Spacer()
                 FooterLink(title: "Quit", systemImage: "power", action: onQuit)
             }

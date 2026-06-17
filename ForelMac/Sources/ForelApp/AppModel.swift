@@ -8,12 +8,22 @@ import Combine
 /// service calls instead of Tauri `invoke()` round-trips.
 @MainActor
 final class AppModel: ObservableObject {
+    /// Which screen the detail pane shows. Settings and History are in-app
+    /// views (not separate windows) reached from the sidebar or menu bar.
+    enum DetailRoute { case rules, history, settings }
+
     @Published var folders: [WatchedFolder] = []
     @Published var selectedFolderId: String?
     @Published var rules: [Rule] = []
     @Published var history: [HistoryEntry] = []
     @Published var paused: Bool = false
     @Published var errorMessage: String?
+    @Published var detailRoute: DetailRoute = .rules
+    @Published var accentPreset: AccentPreset = .default
+    /// Bumped whenever the accent colour changes, so views can force a full
+    /// re-render with `.id(model.accentVersion)` — `ForelTheme.accent` is a
+    /// plain static var, not itself observable.
+    @Published var accentVersion: Int = 0
 
     let db: Database
     private let coordinator: WatcherCoordinator
@@ -29,8 +39,20 @@ final class AppModel: ObservableObject {
         self.coordinator = WatcherCoordinator(db: db)
         self.paused = (try? db.getSetting("paused")) == "1"
 
+        let storedAccent = (try? db.getSetting("accent_color")) ?? nil
+        let preset = storedAccent.flatMap(AccentPreset.init(rawValue:)) ?? .default
+        self.accentPreset = preset
+        ForelTheme.apply(preset)
+
         reloadFolders()
         startWatchingEnabledFolders()
+    }
+
+    func setAccentPreset(_ preset: AccentPreset) {
+        accentPreset = preset
+        ForelTheme.apply(preset)
+        accentVersion += 1
+        try? db.setSetting("accent_color", preset.rawValue)
     }
 
     func reloadFolders() {

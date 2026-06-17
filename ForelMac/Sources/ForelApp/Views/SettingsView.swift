@@ -1,5 +1,4 @@
 import SwiftUI
-import ServiceManagement
 
 private enum AppTheme: String, CaseIterable {
     case system, light, dark
@@ -9,73 +8,99 @@ struct SettingsView: View {
     @EnvironmentObject var model: AppModel
     @EnvironmentObject var updater: UpdaterManager
     @State private var theme: AppTheme = .system
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var launchAtLogin = LoginItem.isEnabled
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
 
-            SectionLabel(title: "Appearance")
-            GlassCard {
-                PickerRow(title: "Theme", selection: themeBinding) {
-                    Text("System").tag(AppTheme.system)
-                    Text("Light").tag(AppTheme.light)
-                    Text("Dark").tag(AppTheme.dark)
-                }
-            }
-
-            SectionLabel(title: "General")
-            GlassCard {
-                ToggleRow(
-                    title: "Launch at login",
-                    subtitle: "Open Forel automatically when you log in",
-                    isOn: launchAtLoginBinding
-                )
-            }
-
-            SectionLabel(title: "Updates")
-            GlassCard {
-                ToggleRow(
-                    title: "Automatic updates",
-                    subtitle: "Check for new versions in the background",
-                    isOn: automaticUpdatesBinding
-                )
-                Divider().overlay(ForelTheme.divider).padding(.leading, 14)
-                SettingsActionRow(
-                    title: "Current version",
-                    subtitle: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "alpha",
-                    buttonTitle: "Check Now",
-                    action: { updater.checkForUpdates() }
-                )
-            }
-
-            SectionLabel(title: "About")
-            GlassCard {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Forel").font(.system(size: 13, weight: .semibold)).foregroundStyle(ForelTheme.primaryText)
-                        Text("Open-source file automation for macOS").font(.system(size: 11)).foregroundStyle(ForelTheme.secondaryText)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    SectionLabel(title: "Appearance")
+                    GlassCard {
+                        PickerRow(title: "Theme", selection: themeBinding) {
+                            Text("System").tag(AppTheme.system)
+                            Text("Light").tag(AppTheme.light)
+                            Text("Dark").tag(AppTheme.dark)
+                        }
+                        Divider().overlay(ForelTheme.divider).padding(.leading, 14)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Accent color").font(.system(size: 13)).foregroundStyle(ForelTheme.primaryText)
+                            AccentColorPicker(selection: accentBinding)
+                        }
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 14)
                     }
-                    Spacer()
+
+                    SectionLabel(title: "General")
+                    GlassCard {
+                        ToggleRow(
+                            title: "Start at login",
+                            subtitle: "Open Forel automatically when you log in",
+                            isOn: launchAtLoginBinding
+                        )
+                    }
+
+                    SectionLabel(title: "Updates")
+                    GlassCard {
+                        ToggleRow(
+                            title: "Automatic updates",
+                            subtitle: "Check for new versions in the background",
+                            isOn: automaticUpdatesBinding
+                        )
+                        Divider().overlay(ForelTheme.divider).padding(.leading, 14)
+                        SettingsActionRow(
+                            title: "Current version",
+                            subtitle: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "alpha",
+                            buttonTitle: "Check Now",
+                            action: { updater.checkForUpdates() }
+                        )
+                    }
+
+                    SectionLabel(title: "About")
+                    GlassCard {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Forel").font(.system(size: 13, weight: .semibold)).foregroundStyle(ForelTheme.primaryText)
+                                Text("Open-source file automation for macOS").font(.system(size: 11)).foregroundStyle(ForelTheme.secondaryText)
+                            }
+                            Spacer()
+                        }
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 14)
+                    }
                 }
-                .padding(.vertical, 10)
-                .padding(.horizontal, 14)
             }
+            .scrollIndicators(.never)
 
             Spacer(minLength: 0)
         }
         .padding(16)
-        .frame(width: 420)
+        .frame(minWidth: 460)
         .background(ForelTheme.background)
-        .preferredColorScheme(.dark)
         .onAppear {
-            let stored = (try? model.db.getSetting("theme")) ?? nil
-            theme = AppTheme(rawValue: stored ?? "system") ?? .system
+            let storedTheme = (try? model.db.getSetting("theme")) ?? nil
+            theme = AppTheme(rawValue: storedTheme ?? "system") ?? .system
+
+            let storedLogin = (try? model.db.getSetting("launch_at_login")) ?? nil
+            launchAtLogin = LoginItem.isEnabled || storedLogin == "1"
         }
     }
 
     private var header: some View {
-        ViewHeader(title: "Settings", subtitle: "Forel preferences")
+        ViewHeader(title: "Settings", subtitle: "Forel preferences") {
+            Button {
+                model.detailRoute = .rules
+            } label: {
+                Image(systemName: "chevron.backward")
+            }
+            .buttonStyle(IconButtonStyle())
+            .help("Back to rules")
+        }
+    }
+
+    private var accentBinding: Binding<AccentPreset> {
+        Binding(get: { model.accentPreset }, set: { model.setAccentPreset($0) })
     }
 
     private var themeBinding: Binding<AppTheme> {
@@ -88,15 +113,11 @@ struct SettingsView: View {
     private var launchAtLoginBinding: Binding<Bool> {
         Binding(get: { launchAtLogin }, set: { enabled in
             launchAtLogin = enabled
-            do {
-                if enabled {
-                    try SMAppService.mainApp.register()
-                } else {
-                    try SMAppService.mainApp.unregister()
-                }
-            } catch {
-                model.errorMessage = "\(error)"
-            }
+            try? model.db.setSetting("launch_at_login", enabled ? "1" : "0")
+            // In a signed .app this registers/unregisters the login item; in an
+            // unsigned dev build it fails silently — the preference is still
+            // saved and applies once running from a packaged build.
+            LoginItem.setEnabled(enabled)
         })
     }
 

@@ -6,7 +6,15 @@ struct SidebarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            ViewHeader(title: "Forel", subtitle: "File automation")
+            ViewHeader(title: "Forel", subtitle: "File automation") {
+                Button {
+                    model.detailRoute = .settings
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .buttonStyle(IconButtonStyle())
+                .help("Settings")
+            }
 
             HStack {
                 SectionLabel(title: "Watched Folders")

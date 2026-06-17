@@ -3,7 +3,6 @@ import ForelCore
 
 struct HistoryView: View {
     @EnvironmentObject var model: AppModel
-    @Binding var showHistory: Bool
 
     private var batches: [(id: String, entries: [HistoryEntry])] {
         let grouped = Dictionary(grouping: model.history, by: \.batchId)
@@ -16,7 +15,7 @@ struct HistoryView: View {
         VStack(alignment: .leading, spacing: 14) {
             ViewHeader(title: "Activity", subtitle: "\(model.history.count) recorded action\(model.history.count == 1 ? "" : "s")") {
                 Button {
-                    showHistory = false
+                    model.detailRoute = .rules
                 } label: {
                     Image(systemName: "chevron.backward")
                 }

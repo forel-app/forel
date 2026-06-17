@@ -32,8 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard let model else { return }
         statusBarController = StatusBarController(
             model: model,
-            window: NSApp.windows.first,
-            checkForUpdates: { [weak self] in self?.updater?.checkForUpdates() }
+            window: NSApp.windows.first
         )
     }
 

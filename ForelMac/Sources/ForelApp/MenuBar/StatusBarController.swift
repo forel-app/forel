@@ -11,15 +11,13 @@ final class StatusBarController: NSObject {
     private let statusItem: NSStatusItem
     private let model: AppModel
     private weak var window: NSWindow?
-    private let checkForUpdates: () -> Void
     private var popover: NSPopover?
     private var pausedSubscription: AnyCancellable?
 
-    init(model: AppModel, window: NSWindow?, checkForUpdates: @escaping () -> Void) {
+    init(model: AppModel, window: NSWindow?) {
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         self.model = model
         self.window = window
-        self.checkForUpdates = checkForUpdates
         super.init()
 
         if let button = statusItem.button {
@@ -44,11 +42,6 @@ final class StatusBarController: NSObject {
             onOpenMainWindow: { [weak self] in
                 self?.popover?.performClose(nil)
                 self?.openForel()
-            },
-            onCheckForUpdates: { [weak self] in
-                self?.popover?.performClose(nil)
-                self?.openForel()
-                self?.checkForUpdates()
             },
             onQuit: { NSApp.terminate(nil) }
         )
