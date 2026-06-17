@@ -898,6 +898,28 @@ mod tests {
     }
 
     #[test]
+    fn insert_rule_appends_after_reorder() {
+        let conn = connection();
+        let folder = folder();
+        insert_folder(&conn, &folder).expect("insert folder");
+
+        let first = rule(&folder.id, "first");
+        let second = rule(&folder.id, "second");
+        insert_rule(&conn, &first).expect("insert first");
+        insert_rule(&conn, &second).expect("insert second");
+
+        reorder_rules(&conn, &folder.id, &[second.id.clone(), first.id.clone()])
+            .expect("reorder rules");
+        insert_rule(&conn, &rule(&folder.id, "third")).expect("insert third");
+
+        let loaded = list_rules(&conn, &folder.id).expect("list rules");
+        let names: Vec<&str> = loaded.iter().map(|rule| rule.name.as_str()).collect();
+        let orders: Vec<i64> = loaded.iter().map(|rule| rule.priority).collect();
+        assert_eq!(names, vec!["second", "first", "third"]);
+        assert_eq!(orders, vec![0, 1, 2]);
+    }
+
+    #[test]
     fn reorder_rules_rejects_invalid_rule_sets() {
         let conn = connection();
         let primary_folder = folder();
