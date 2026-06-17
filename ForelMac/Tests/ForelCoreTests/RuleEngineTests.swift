@@ -77,6 +77,49 @@ import Foundation
         #expect(RuleEngine.evaluateFile(path: nested, depth: 1, rules: [shallowRule], batchId: "batch").matched == [])
     }
 
+    @Test func recursionDepthSupportsCurrentFolderLimitedDepthAndAllLevels() throws {
+        let ruleCurrent = makeRule(name: "current", recursionDepth: 0)
+        let ruleOneLevel = makeRule(name: "one level", recursionDepth: 1)
+        let ruleAllLevels = makeRule(name: "all levels", recursionDepth: nil)
+
+        #expect(RuleEngine.evaluateFile(path: "/tmp/file.txt", depth: 0, rules: [ruleCurrent, ruleOneLevel, ruleAllLevels], batchId: "batch").matched == [
+            "current",
+            "one level",
+            "all levels",
+        ])
+        #expect(RuleEngine.evaluateFile(path: "/tmp/Sub/file.txt", depth: 1, rules: [ruleCurrent, ruleOneLevel, ruleAllLevels], batchId: "batch").matched == [
+            "one level",
+            "all levels",
+        ])
+        #expect(RuleEngine.evaluateFile(path: "/tmp/Sub/Deep/file.txt", depth: 2, rules: [ruleCurrent, ruleOneLevel, ruleAllLevels], batchId: "batch").matched == [
+            "all levels",
+        ])
+    }
+
+    @Test func evaluateFileExecutesMatchingRulesAndSkipsNonMatchingRules() throws {
+        let dir = TempDir()
+        let file = dir.file("photo.jpg", contents: "image")
+        let matching = makeRule(
+            name: "matching image",
+            conditions: [
+                makeCondition(.extension_, .is, "jpg"),
+                makeCondition(.kind, .is, "image"),
+            ],
+            actions: [makeAction(.addTag, .object(["tags": .stringArray(["Matched"])]))]
+        )
+        let nonMatching = makeRule(
+            name: "non matching pdf",
+            conditions: [makeCondition(.kind, .is, "pdf")],
+            actions: [makeAction(.addTag, .object(["tags": .stringArray(["Wrong"])]))]
+        )
+
+        let result = RuleEngine.evaluateFile(path: file, depth: 0, rules: [matching, nonMatching], batchId: "batch")
+
+        #expect(result.matched == ["matching image"])
+        #expect(result.history.count == 1)
+        #expect(FinderTags.read(file) == ["Matched"])
+    }
+
     @Test func pathDepthComputesRelativeDepthFromRoot() throws {
         #expect(RuleEngine.pathDepth(root: "/Users/x/Inbox", path: "/Users/x/Inbox/file.txt") == 0)
         #expect(RuleEngine.pathDepth(root: "/Users/x/Inbox", path: "/Users/x/Inbox/Sub/file.txt") == 1)

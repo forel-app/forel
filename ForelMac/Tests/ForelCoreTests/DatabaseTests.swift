@@ -38,6 +38,44 @@ import SQLite3
         #expect(loaded.recursionDepth == 0)
     }
 
+    @Test func ruleRoundTripPreservesEditorConditionFormatsAndScope() throws {
+        let db = try makeDB()
+        let folder = WatchedFolder(path: "/tmp/forel-test-\(UUID().uuidString)")
+        try db.insertFolder(folder)
+        var rule = makeRule(folderId: folder.id, name: "editor formats", recursionDepth: 3)
+        try db.insertRule(rule)
+
+        rule.conditions = [
+            makeCondition(.createdAt, .withinLast, "7 weeks", ruleId: rule.id),
+            makeCondition(.dateModified, .before, "2026-06-17", ruleId: rule.id),
+            makeCondition(.sizeBytes, .greaterThan, "12 MB", ruleId: rule.id),
+            makeCondition(.kind, .isNot, "archive", ruleId: rule.id),
+        ]
+        try db.updateRule(rule)
+
+        let loaded = try #require(db.listRules(folderId: folder.id).first)
+        #expect(loaded.recursionDepth == 3)
+        #expect(loaded.conditions.map(\.kind) == [.createdAt, .dateModified, .sizeBytes, .kind])
+        #expect(loaded.conditions.map(\.operator) == [.withinLast, .before, .greaterThan, .isNot])
+        #expect(loaded.conditions.map(\.value) == ["7 weeks", "2026-06-17", "12 MB", "archive"])
+
+        loaded.conditions.forEach { condition in
+            #expect(condition.ruleId == rule.id)
+        }
+    }
+
+    @Test func ruleRoundTripPreservesAllLevelsScope() throws {
+        let db = try makeDB()
+        let folder = WatchedFolder(path: "/tmp/forel-test-\(UUID().uuidString)")
+        try db.insertFolder(folder)
+        let rule = makeRule(folderId: folder.id, name: "all levels", recursionDepth: nil)
+
+        try db.insertRule(rule)
+
+        let loaded = try #require(db.listRules(folderId: folder.id).first)
+        #expect(loaded.recursionDepth == nil)
+    }
+
     @Test func insertRuleAppendsToFolderOrder() throws {
         let db = try makeDB()
         let folder = WatchedFolder(path: "/tmp/forel-test-\(UUID().uuidString)")

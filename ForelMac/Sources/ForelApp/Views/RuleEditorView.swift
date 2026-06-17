@@ -107,6 +107,7 @@ struct RuleEditorView: View {
         .padding(22)
         .frame(width: 760, height: 680)
         .background(ForelTheme.background)
+        .background(WindowActivationBridge())
     }
 
     private func placeholder(_ text: String) -> some View {
