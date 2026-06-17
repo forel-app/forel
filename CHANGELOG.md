@@ -10,6 +10,8 @@ All notable changes to Forel are documented here. Format loosely follows
 - Fixed the update checker sometimes offering an older alpha release
 - Hardened folder-watching against a rare internal timing issue (no
   user-visible change).
+- Rules with an invalid regex condition now show an error right in the
+  editor and can't be saved, instead of silently never matching any file.
 
 ## [0.1.0-beta.1] - 2026-06-17
 

@@ -101,13 +101,22 @@ struct RuleEditorView: View {
                 Button("Save") { onSave(rule) }
                     .buttonStyle(PrimaryButtonStyle())
                     .keyboardShortcut(.defaultAction)
-                    .disabled(rule.name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(rule.name.trimmingCharacters(in: .whitespaces).isEmpty || hasInvalidRegexCondition)
             }
         }
         .padding(22)
         .frame(width: 760, height: 680)
         .background(ForelTheme.background)
         .background(WindowActivationBridge())
+    }
+
+    /// A rule with an unparsable regex would just silently never match at
+    /// run time; block saving it instead of letting that ship invisibly.
+    private var hasInvalidRegexCondition: Bool {
+        rule.conditions.contains { condition in
+            guard condition.operator == .matchesRegex, !condition.value.isEmpty else { return false }
+            return (try? NSRegularExpression(pattern: condition.value)) == nil
+        }
     }
 
     private func placeholder(_ text: String) -> some View {
@@ -262,6 +271,8 @@ private struct ConditionRow: View {
             RelativeDateValueEditor(value: $condition.value)
         } else if condition.kind.isDateKind {
             AbsoluteDateValueEditor(value: $condition.value)
+        } else if condition.operator == .matchesRegex {
+            RegexValueEditor(value: $condition.value)
         } else {
             GlassField(placeholder: "Value", text: $condition.value)
         }
@@ -307,6 +318,36 @@ private struct ConditionRow: View {
             return operator_.isRelativeDateOperator ? "7 days" : DateValueFormatter.string(from: Date())
         }
         return ""
+    }
+}
+
+/// Plain text field for a regex condition, but validated as you type: an
+/// invalid pattern would otherwise just make the condition silently never
+/// match at run time, with no indication why. Catching it here means the
+/// engine itself can stay tolerant (a regex error is still just "no match",
+/// not a crash) while the person writing the rule actually finds out.
+private struct RegexValueEditor: View {
+    @Binding var value: String
+
+    private var errorMessage: String? {
+        guard !value.isEmpty else { return nil }
+        do {
+            _ = try NSRegularExpression(pattern: value)
+            return nil
+        } catch {
+            return "Invalid regular expression"
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            GlassField(placeholder: "Regex pattern", text: $value)
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.system(size: 10))
+                    .foregroundStyle(ForelTheme.danger)
+            }
+        }
     }
 }
 
