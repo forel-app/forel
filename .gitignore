@@ -11,18 +11,8 @@ DerivedData/
 .vscode/*
 !.vscode/launch.json
 
-# Legacy Tauri archive
-tauri/.tauri/
-tauri/node_modules/
-tauri/dist/
-tauri/.pnpm-store/
-tauri/.vite/
-tauri/src-tauri/target/
-tauri/src-tauri/gen/schemas/
-
 # Local workspace leftovers
 dist/
 node_modules/
 .pnpm-store/
-.tauri/
 .vite/

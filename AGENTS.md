@@ -1,7 +1,6 @@
 # Forel - AI & Agent Guidelines
 
 > Source of truth for AI coding agents working on the Swift app in this repository.
-> The previous Tauri/React implementation is archived in `tauri/`.
 
 ## What Forel is
 
@@ -27,7 +26,6 @@ forel/
 │   ├── ForelApp/
 │   └── ForelCore/
 ├── Tests/
-├── tauri/          # archived Tauri + React implementation
 └── README.md
 ```
 

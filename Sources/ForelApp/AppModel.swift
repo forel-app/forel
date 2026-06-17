@@ -5,7 +5,6 @@ import Combine
 /// Central observable state for the SwiftUI app: owns the database, the
 /// watcher coordinator, and the in-memory view of folders/rules. Mirrors the
 /// surface of the old `useForelStore` Zustand store, but as direct Swift
-/// service calls instead of Tauri `invoke()` round-trips.
 @MainActor
 final class AppModel: ObservableObject {
     /// Which screen the detail pane shows. Settings and History are in-app

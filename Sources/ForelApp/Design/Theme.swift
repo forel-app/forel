@@ -20,7 +20,6 @@ enum ForelTheme {
     static let background = Color(light: NSColor(red: 0.94, green: 0.95, blue: 0.97, alpha: 1),
                                   dark: NSColor(red: 0.07, green: 0.07, blue: 0.10, alpha: 1))
     /// Mutable so the user can change it from Settings; defaults to the same
-    /// system blue (#0A84FF) used as the accent in the Tauri version.
     static var accent: Color = AccentPreset.blue.color
     static let success = Color(red: 0.20, green: 0.78, blue: 0.35)
     static let danger = Color(red: 1.0, green: 0.27, blue: 0.23)
@@ -50,7 +49,6 @@ private extension Color {
 }
 
 /// Named accent colour choices offered in Settings, in the same spirit as
-/// macOS's own accent colour picker. `blue` matches the Tauri app's accent
 /// exactly (`--accent: #0a84ff`).
 enum AccentPreset: String, CaseIterable, Identifiable {
     case blue, purple, pink, red, orange, yellow, green, graphite
