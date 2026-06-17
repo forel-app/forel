@@ -6,7 +6,9 @@ struct SidebarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            ViewHeader(title: "Forel", subtitle: "File automation")
+            ViewHeader(title: "Forel", subtitle: "File automation") {
+                StatusBadge(active: !model.paused)
+            }
 
             HStack {
                 SectionLabel(title: "Watched Folders")

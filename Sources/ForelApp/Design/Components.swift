@@ -42,9 +42,9 @@ struct StatusBadge: View {
 
     var body: some View {
         Text(active ? "ACTIVE" : "PAUSED")
-            .font(.system(size: 11, weight: .bold))
+            .font(.system(size: 9, weight: .bold))
             .foregroundStyle(active ? ForelTheme.success : ForelTheme.danger)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 6)
             .padding(.vertical, 4)
             .background(Capsule().fill((active ? ForelTheme.success : ForelTheme.danger).opacity(0.16)))
     }
@@ -376,11 +376,19 @@ struct ViewHeader<Trailing: View>: View {
                 BrandMark()
             }
             VStack(alignment: .leading, spacing: 1) {
-                Text(title).font(.system(size: 15, weight: .bold)).foregroundStyle(ForelTheme.primaryText)
-                Text(subtitle).font(.system(size: 11)).foregroundStyle(ForelTheme.secondaryText)
+                Text(title)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(ForelTheme.primaryText)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.system(size: 11))
+                    .foregroundStyle(ForelTheme.secondaryText)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
-            Spacer()
+            Spacer(minLength: 8)
             trailing
+                .layoutPriority(1)
         }
     }
 }

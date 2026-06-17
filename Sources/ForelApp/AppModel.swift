@@ -37,7 +37,13 @@ final class AppModel: ObservableObject {
         let db = try Database(path: dbPath)
         self.db = db
         self.coordinator = WatcherCoordinator(db: db)
-        self.paused = (try? db.getSetting("paused")) == "1"
+        // Default to paused (watching off) on a fresh install — a brand-new
+        // user hasn't set up any rules yet, and starting to watch folders
+        // immediately means triggering permission prompts and risking rule-less
+        // surprises before they've configured anything. Once they've explicitly
+        // set this either way, that choice persists.
+        let storedPaused = try? db.getSetting("paused")
+        self.paused = storedPaused.map { $0 == "1" } ?? true
 
         let storedAccent = (try? db.getSetting("accent_color")) ?? nil
         let preset = storedAccent.flatMap(AccentPreset.init(rawValue:)) ?? .default

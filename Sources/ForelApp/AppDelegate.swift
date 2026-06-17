@@ -31,6 +31,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         try? model.db.setSetting("has_launched_before", "1")
         model.detailRoute = .rules
         openMainWindow()
+        enableLaunchAtLoginByDefault()
+    }
+
+    /// Opt-in by default on first install — a folder watcher that isn't
+    /// running after a reboot isn't doing its job. The Settings toggle
+    /// (and its own `launch_at_login` setting) stays the single source of
+    /// truth from here on; this only seeds it once.
+    private func enableLaunchAtLoginByDefault() {
+        guard let model else { return }
+        try? model.db.setSetting("launch_at_login", "1")
+        LoginItem.setEnabled(true)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

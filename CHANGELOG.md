@@ -5,6 +5,10 @@ All notable changes to Forel are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+- New installs now start at login by default, and start with watching
+  paused until you've set up your folders and rules.
+
 ### Fixed
 - Fixed the "Update available" banner text getting cut off in the menu bar
   panel.
