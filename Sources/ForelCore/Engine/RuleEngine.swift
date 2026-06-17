@@ -61,11 +61,14 @@ public enum RuleEngine {
 
         while !pending.isEmpty {
             let target = pending.removeFirst()
+            var currentPath = target.path
+            var currentDepth = target.depth
+
             for ruleIndex in target.startRuleIndex..<rules.count {
                 let rule = rules[ruleIndex]
-                guard rule.enabled, ruleMatches(rule, path: target.path, depth: target.depth) else { continue }
+                guard rule.enabled, ruleMatches(rule, path: currentPath, depth: currentDepth) else { continue }
 
-                let result = executeActions(rule, path: target.path, batchId: batchId)
+                let result = executeActions(rule, path: currentPath, batchId: batchId)
                 history.append(contentsOf: result.history)
                 matched.append(rule.name)
 
@@ -75,9 +78,25 @@ public enum RuleEngine {
                         guard let depth = pathDepth(root: root, path: copiedPath) else { continue }
                         copiedDepth = depth
                     } else {
-                        copiedDepth = target.depth
+                        copiedDepth = currentDepth
                     }
                     pending.append(PendingFile(path: copiedPath, depth: copiedDepth, startRuleIndex: ruleIndex + 1))
+                }
+
+                // A terminal action (move/trash/delete) takes the file out of
+                // this location entirely, same as it stops the action chain
+                // within a single rule — no further rule in this pass should
+                // be evaluated against it.
+                if result.isTerminal { break }
+
+                // A non-terminal action (e.g. rename) can still change the
+                // file's path; follow it so the next rule in the chain sees
+                // where the file actually is now, not where it used to be.
+                if result.finalPath != currentPath {
+                    currentPath = result.finalPath
+                    if let root, let depth = pathDepth(root: root, path: currentPath) {
+                        currentDepth = depth
+                    }
                 }
             }
         }
@@ -166,12 +185,13 @@ public enum RuleEngine {
         }.max()
     }
 
-    private static func executeActions(_ rule: Rule, path: String, batchId: String) -> (history: [HistoryEntry], copiedPaths: [String]) {
+    private static func executeActions(_ rule: Rule, path: String, batchId: String) -> (history: [HistoryEntry], copiedPaths: [String], finalPath: String, isTerminal: Bool) {
         let sorted = rule.actions.sorted { $0.position < $1.position }
 
         var history: [HistoryEntry] = []
         var copiedPaths: [String] = []
         var current = path
+        var stoppedOnTerminal = false
         for action in sorted {
             let isTerminal = action.kind == .moveToFolder || action.kind == .moveToTrash || action.kind == .delete
             let original = current
@@ -201,8 +221,11 @@ public enum RuleEngine {
             } catch {
                 // Logged by the caller; a failed action does not abort the rest of the rule run.
             }
-            if isTerminal { break }
+            if isTerminal {
+                stoppedOnTerminal = true
+                break
+            }
         }
-        return (history, copiedPaths)
+        return (history, copiedPaths, current, stoppedOnTerminal)
     }
 }

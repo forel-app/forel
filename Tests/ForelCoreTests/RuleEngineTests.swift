@@ -164,6 +164,45 @@ import Foundation
         #expect(!FileManager.default.fileExists(atPath: (dir.path as NSString).appendingPathComponent("document (2).pdf")))
     }
 
+    @Test func renamedFilesContinueThroughFollowingRulesAtTheirNewName() throws {
+        let dir = TempDir()
+        let file = dir.file("draft.pdf", contents: "content")
+        let archivedDir = dir.dir("Archived")
+
+        let renameRule = makeRule(
+            name: "Rename to final",
+            actions: [makeAction(.rename, .object(["pattern": .string("final.pdf")]))]
+        )
+        let archiveRenamedRule = makeRule(
+            name: "Archive final",
+            conditions: [makeCondition(.name, .contains, "final")],
+            actions: [makeAction(.moveToFolder, .object(["destination": .string(archivedDir)]))]
+        )
+        let shouldNeverMatchOldName = makeRule(
+            name: "Would only match the old name",
+            conditions: [makeCondition(.name, .contains, "draft")],
+            actions: [makeAction(.addTag, .object(["tags": .stringArray(["Stale"])]))]
+        )
+
+        let result = RuleEngine.evaluateFile(
+            path: file,
+            depth: 0,
+            rules: [renameRule, archiveRenamedRule, shouldNeverMatchOldName],
+            batchId: "batch",
+            root: dir.path
+        )
+
+        let renamed = (dir.path as NSString).appendingPathComponent("final.pdf")
+        let archived = (archivedDir as NSString).appendingPathComponent("final.pdf")
+
+        #expect(result.matched == ["Rename to final", "Archive final"])
+        #expect(result.history.map(\.actionKind) == [.rename, .moveToFolder])
+        #expect(result.history[1].originalPath == renamed)
+        #expect(!FileManager.default.fileExists(atPath: file))
+        #expect(!FileManager.default.fileExists(atPath: renamed))
+        #expect(FileManager.default.fileExists(atPath: archived))
+    }
+
     @Test func pathDepthComputesRelativeDepthFromRoot() throws {
         #expect(RuleEngine.pathDepth(root: "/Users/x/Inbox", path: "/Users/x/Inbox/file.txt") == 0)
         #expect(RuleEngine.pathDepth(root: "/Users/x/Inbox", path: "/Users/x/Inbox/Sub/file.txt") == 1)

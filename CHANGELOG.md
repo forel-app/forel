@@ -3,6 +3,12 @@
 All notable changes to Forel are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+- Fixed rules getting stuck when chained after a rename.
+- Fixed the update checker sometimes offering an older alpha release 
+
 ## [0.1.0-beta.1] - 2026-06-17
 
 The app has been rewritten from scratch in Swift, replacing the previous
