@@ -8,11 +8,9 @@
 
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black?style=flat-square&logo=apple)](https://www.apple.com/macos/)
 [![Swift 6](https://img.shields.io/badge/Swift-6-orange?style=flat-square&logo=swift)](https://www.swift.org)
-[![SQLite](https://img.shields.io/badge/SQLite-embedded-blue?style=flat-square&logo=sqlite)](https://www.sqlite.org)
-[![Sparkle](https://img.shields.io/badge/Sparkle-updates-7b61ff?style=flat-square)](https://sparkle-project.org)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-ffdd00?style=flat-square&logo=buymeacoffee&logoColor=000)](https://buymeacoffee.com/lionelguic9)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/forel-app/forel?style=flat-square)](https://github.com/forel-app/forel/stargazers)
+
 
 [Download](#installation) · [Contributing](#contributing)
 
