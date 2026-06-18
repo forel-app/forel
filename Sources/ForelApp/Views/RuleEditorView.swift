@@ -233,16 +233,16 @@ private struct ConditionRow: View {
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             Picker("", selection: kindBinding) {
-                ForEach(ConditionEditorLabels.kinds, id: \.0) { kind, label in
-                    Text(label).tag(kind)
+                ForEach(RuleSchema.conditionKinds, id: \.self) { kind in
+                    Text(kind.label).tag(kind)
                 }
             }
             .labelsHidden()
             .frame(width: 160)
 
             Picker("", selection: operatorBinding) {
-                ForEach(ConditionEditorLabels.operators(for: condition.kind), id: \.0) { op, label in
-                    Text(label).tag(op)
+                ForEach(condition.kind.validOperators, id: \.self) { op in
+                    Text(op.label).tag(op)
                 }
             }
             .labelsHidden()
@@ -261,19 +261,20 @@ private struct ConditionRow: View {
     }
 
     @ViewBuilder private var conditionValue: some View {
-        if condition.kind == .colorLabel {
+        switch RuleSchema.valueKind(for: condition.kind, operator: condition.operator) {
+        case .colorLabel:
             ColorLabelPicker(selection: $condition.value, allowNone: false)
-        } else if condition.kind == .kind {
+        case .fileKind:
             KindValuePicker(value: $condition.value)
-        } else if condition.kind == .sizeBytes {
+        case .size:
             SizeValueEditor(value: $condition.value)
-        } else if condition.kind.isDateKind && condition.operator.isRelativeDateOperator {
+        case .relativeDate:
             RelativeDateValueEditor(value: $condition.value)
-        } else if condition.kind.isDateKind {
+        case .absoluteDate:
             AbsoluteDateValueEditor(value: $condition.value)
-        } else if condition.operator == .matchesRegex {
+        case .regex:
             RegexValueEditor(value: $condition.value)
-        } else {
+        case .text:
             GlassField(placeholder: "Value", text: $condition.value)
         }
     }
@@ -283,9 +284,8 @@ private struct ConditionRow: View {
             get: { condition.kind },
             set: { newKind in
                 condition.kind = newKind
-                let operators = ConditionEditorLabels.operators(for: newKind).map(\.0)
-                if !operators.contains(condition.operator) {
-                    condition.operator = ConditionEditorLabels.defaultOperator(for: newKind)
+                if !newKind.validOperators.contains(condition.operator) {
+                    condition.operator = newKind.defaultOperator
                 }
                 condition.value = defaultValue(for: newKind, operator_: condition.operator)
             }
@@ -298,26 +298,27 @@ private struct ConditionRow: View {
             set: { newOperator in
                 let oldOperator = condition.operator
                 condition.operator = newOperator
-                if condition.kind.isDateKind {
-                    let changedValueFormat = oldOperator.isRelativeDateOperator != newOperator.isRelativeDateOperator
+                if condition.kind.baseValueKind == .absoluteDate {
+                    let changedValueFormat = oldOperator.usesRelativeDateValue != newOperator.usesRelativeDateValue
                     if changedValueFormat || condition.value.trimmingCharacters(in: .whitespaces).isEmpty {
-                        condition.value = newOperator.isRelativeDateOperator ? "7 days" : DateValueFormatter.string(from: Date())
+                        condition.value = newOperator.usesRelativeDateValue ? "7 days" : DateValueFormatter.string(from: Date())
                     }
                 }
                 if condition.kind == .sizeBytes, condition.value.trimmingCharacters(in: .whitespaces).isEmpty {
-                    condition.value = "0 bytes"
+                    condition.value = "0 MB"
                 }
             }
         )
     }
 
     private func defaultValue(for kind: ConditionKind, operator_: Operator) -> String {
-        if kind == .kind { return "image" }
-        if kind == .sizeBytes { return "0 bytes" }
-        if kind.isDateKind {
-            return operator_.isRelativeDateOperator ? "7 days" : DateValueFormatter.string(from: Date())
+        switch kind.baseValueKind {
+        case .fileKind: return "image"
+        case .size: return "0 MB"
+        case .absoluteDate:
+            return operator_.usesRelativeDateValue ? "7 days" : DateValueFormatter.string(from: Date())
+        default: return ""
         }
-        return ""
     }
 }
 
@@ -449,8 +450,8 @@ private struct SizeValueEditor: View {
     private var parts: (number: String, unit: String) {
         let pieces = value.split(separator: " ", maxSplits: 1).map(String.init)
         let number = pieces.first?.filter { $0.isNumber || $0 == "." }
-        let rawUnit = pieces.count > 1 ? pieces[1] : "bytes"
-        let unit = ["bytes", "KB", "MB", "GB"].contains(rawUnit) ? rawUnit : "bytes"
+        let rawUnit = pieces.count > 1 ? pieces[1] : "MB"
+        let unit = ["bytes", "KB", "MB", "GB"].contains(rawUnit) ? rawUnit : "MB"
         return ((number?.isEmpty == false ? number! : "0"), unit)
     }
 }
@@ -460,7 +461,7 @@ private struct KindValuePicker: View {
 
     var body: some View {
         Picker("", selection: valueBinding) {
-            ForEach(ConditionEditorLabels.fileKinds, id: \.0) { value, label in
+            ForEach(FileKindCatalog.all, id: \.value) { value, label in
                 Text(label).tag(value)
             }
         }
@@ -471,7 +472,7 @@ private struct KindValuePicker: View {
     private var valueBinding: Binding<String> {
         Binding(
             get: {
-                ConditionEditorLabels.fileKinds.contains { $0.0 == value } ? value : "image"
+                FileKindCatalog.all.contains { $0.value == value } ? value : "image"
             },
             set: { value = $0 }
         )
@@ -485,8 +486,8 @@ private struct ActionRow: View {
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             Picker("", selection: kindBinding) {
-                ForEach(ConditionEditorLabels.actionKinds, id: \.0) { kind, label in
-                    Text(label).tag(kind)
+                ForEach(RuleSchema.actionKinds, id: \.self) { kind in
+                    Text(kind.label).tag(kind)
                 }
             }
             .labelsHidden()
@@ -510,15 +511,15 @@ private struct ActionRow: View {
     @ViewBuilder private var actionParams: some View {
         switch action.kind {
         case .moveToFolder, .copyToFolder:
-            FolderField(placeholder: "Destination folder", path: paramBinding("destination"))
+            FolderField(placeholder: "Destination folder", path: paramBinding(ActionParam.destination))
         case .rename:
-            RenamePatternEditor(pattern: paramBinding("pattern"))
+            RenamePatternEditor(pattern: paramBinding(ActionParam.pattern))
         case .addTag, .removeTag:
             TagTokensEditor(tags: tagsBinding, placeholder: action.kind == .addTag ? "Add tag" : "Tag")
         case .setColorLabel:
-            ColorLabelPicker(selection: paramBinding("color"), allowNone: true)
+            ColorLabelPicker(selection: paramBinding(ActionParam.color), allowNone: true)
         case .runScript:
-            GlassField(placeholder: "Bash script (file path in $FOREL_FILE)", text: paramBinding("script"))
+            GlassField(placeholder: "Bash script (file path in $FOREL_FILE)", text: paramBinding(ActionParam.script))
         case .moveToTrash, .delete:
             Text("No parameters")
                 .font(.system(size: 11))
@@ -551,9 +552,10 @@ private struct ActionRow: View {
     private var tagsBinding: Binding<[String]> {
         Binding(
             get: {
-                if let tags = action.params["tags"]?.arrayValue {
+                if let tags = action.params[ActionParam.tags]?.arrayValue {
                     return tags.compactMap(\.stringValue)
                 }
+                // Legacy single-tag param from older saved rules.
                 if let tag = action.params["tag"]?.stringValue, !tag.trimmingCharacters(in: .whitespaces).isEmpty {
                     return [tag]
                 }
@@ -565,7 +567,7 @@ private struct ActionRow: View {
                     dict = existing
                 }
                 let normalized = newTags.map { JSONValue.string($0) }
-                dict["tags"] = .array(normalized)
+                dict[ActionParam.tags] = .array(normalized)
                 dict.removeValue(forKey: "tag")
                 action.params = .object(dict)
             }
@@ -707,72 +709,6 @@ private struct RenamePatternEditor: View {
         } else {
             pattern = "\(trimmed)\(trimmed.hasSuffix("-") || trimmed.hasSuffix(".") ? "" : "-")\(token)"
         }
-    }
-}
-
-enum ConditionEditorLabels {
-    static let kinds: [(ConditionKind, String)] = [
-        (.name, "Name"), (.extension_, "Extension"), (.kind, "Kind"), (.sizeBytes, "Size"),
-        (.tags, "Tags"), (.colorLabel, "Color label"), (.contents, "Contents"),
-        (.createdAt, "Date created"), (.dateModified, "Date modified"), (.dateAdded, "Date added"),
-    ]
-
-    private static let allOperators: [(Operator, String)] = [
-        (.is, "is"), (.isNot, "is not"), (.contains, "contains"), (.doesNotContain, "does not contain"),
-        (.startsWith, "starts with"), (.endsWith, "ends with"), (.matchesRegex, "matches regex"),
-        (.greaterThan, "greater than"), (.lessThan, "less than"), (.before, "is before"),
-        (.after, "is after"), (.olderThan, "is older than"), (.withinLast, "is within the last"),
-    ]
-
-    static func operators(for kind: ConditionKind) -> [(Operator, String)] {
-        switch kind {
-        case .createdAt, .dateModified, .dateAdded:
-            return allOperators.filter { [.before, .after, .olderThan, .withinLast].contains($0.0) }
-        case .sizeBytes:
-            return allOperators.filter { [.is, .isNot, .greaterThan, .lessThan].contains($0.0) }
-        case .kind:
-            return allOperators.filter { [.is, .isNot].contains($0.0) }
-        case .colorLabel:
-            return allOperators.filter { [.is, .isNot].contains($0.0) }
-        default:
-            return allOperators.filter { [.is, .isNot, .contains, .doesNotContain, .startsWith, .endsWith, .matchesRegex].contains($0.0) }
-        }
-    }
-
-    static func defaultOperator(for kind: ConditionKind) -> Operator {
-        kind.isDateKind ? .before : operators(for: kind).first?.0 ?? .is
-    }
-
-    static let fileKinds: [(String, String)] = [
-        ("image", "Image"),
-        ("movie", "Movie"),
-        ("music", "Music"),
-        ("pdf", "PDF"),
-        ("text", "Text"),
-        ("document", "Document"),
-        ("presentation", "Presentation"),
-        ("archive", "Archive"),
-        ("disk_image", "Disk Image"),
-        ("folder", "Folder"),
-        ("application", "Application"),
-    ]
-
-    static let actionKinds: [(ActionKind, String)] = [
-        (.moveToFolder, "Move to folder"), (.copyToFolder, "Copy to folder"), (.rename, "Rename"),
-        (.moveToTrash, "Move to Trash"), (.delete, "Delete"), (.addTag, "Add tag"),
-        (.removeTag, "Remove tag"), (.setColorLabel, "Set color label"), (.runScript, "Run script"),
-    ]
-}
-
-private extension ConditionKind {
-    var isDateKind: Bool {
-        self == .createdAt || self == .dateModified || self == .dateAdded
-    }
-}
-
-private extension Operator {
-    var isRelativeDateOperator: Bool {
-        self == .olderThan || self == .withinLast
     }
 }
 

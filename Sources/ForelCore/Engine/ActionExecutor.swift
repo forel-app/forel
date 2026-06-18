@@ -115,7 +115,7 @@ public enum ActionExecutor {
     public static func execute(_ action: Action, path: String) throws -> Applied {
         switch action.kind {
         case .moveToFolder:
-            let destDir = try stringParam(action, "destination", "MoveToFolder")
+            let destDir = try stringParam(action, ActionParam.destination, "MoveToFolder")
             return try moveIntoDir(path: path, destDir: destDir)
         case .copyToFolder:
             return try copyToFolder(action, path: path)
@@ -151,7 +151,7 @@ public enum ActionExecutor {
     }
 
     private static func copyToFolder(_ action: Action, path: String) throws -> Applied {
-        let destDir = try stringParam(action, "destination", "CopyToFolder")
+        let destDir = try stringParam(action, ActionParam.destination, "CopyToFolder")
         try FileManager.default.createDirectory(atPath: destDir, withIntermediateDirectories: true)
         let fileName = (path as NSString).lastPathComponent
         let dest = uniqueDest(dir: destDir, fileName: fileName)
@@ -160,7 +160,7 @@ public enum ActionExecutor {
     }
 
     private static func renameFile(_ action: Action, path: String) throws -> Applied {
-        let pattern = try stringParam(action, "pattern", "Rename")
+        let pattern = try stringParam(action, ActionParam.pattern, "Rename")
         let newName = try applyRenamePattern(pattern, path: path)
         let dest = (path as NSString).deletingLastPathComponent + "/" + newName
         try FileManager.default.moveItem(atPath: path, toPath: dest)
@@ -182,14 +182,14 @@ public enum ActionExecutor {
     }
 
     private static func setColor(_ action: Action, path: String) throws -> Applied {
-        let color = action.params["color"]?.stringValue ?? ""
+        let color = action.params[ActionParam.color]?.stringValue ?? ""
         let previous = FinderTags.currentColorName(path)
         try FinderTags.setColorLabel(path, color: color)
         return Applied(newPath: path, undo: .color(path: path, previous: previous))
     }
 
     private static func runScript(_ action: Action, path: String) throws -> Applied {
-        let script = try stringParam(action, "script", "RunScript")
+        let script = try stringParam(action, ActionParam.script, "RunScript")
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
         process.arguments = ["-c", script]
@@ -238,7 +238,7 @@ public enum ActionExecutor {
 
         switch action.kind {
         case .moveToFolder:
-            let destDir = action.params["destination"]?.stringValue ?? ""
+            let destDir = action.params[ActionParam.destination]?.stringValue ?? ""
             let target = (destDir as NSString).appendingPathComponent(fileName)
             return ActionPlan(
                 kind: action.kind,
@@ -251,7 +251,7 @@ public enum ActionExecutor {
                 isTerminal: true
             )
         case .copyToFolder:
-            let destDir = action.params["destination"]?.stringValue ?? ""
+            let destDir = action.params[ActionParam.destination]?.stringValue ?? ""
             let target = (destDir as NSString).appendingPathComponent(fileName)
             return ActionPlan(
                 kind: action.kind,
@@ -264,7 +264,7 @@ public enum ActionExecutor {
                 isTerminal: false
             )
         case .rename:
-            let pattern = action.params["pattern"]?.stringValue ?? ""
+            let pattern = action.params[ActionParam.pattern]?.stringValue ?? ""
             let newName = try applyRenamePattern(pattern, path: path)
             let target = ((path as NSString).deletingLastPathComponent as NSString).appendingPathComponent(newName)
             return ActionPlan(
@@ -334,7 +334,7 @@ public enum ActionExecutor {
                 isTerminal: false
             )
         case .setColorLabel:
-            let color = action.params["color"]?.stringValue ?? ""
+            let color = action.params[ActionParam.color]?.stringValue ?? ""
             return ActionPlan(
                 kind: action.kind,
                 description: color.isEmpty ? "Clear color label" : "Set color label to \(color)",
@@ -346,7 +346,7 @@ public enum ActionExecutor {
                 isTerminal: false
             )
         case .runScript:
-            let script = action.params["script"]?.stringValue ?? ""
+            let script = action.params[ActionParam.script]?.stringValue ?? ""
             let firstLine = script.split(separator: "\n").first.map(String.init)?.trimmingCharacters(in: .whitespaces) ?? ""
             return ActionPlan(
                 kind: action.kind,
@@ -364,7 +364,7 @@ public enum ActionExecutor {
     public static func wouldChange(_ action: Action, path: String) -> Bool {
         switch action.kind {
         case .setColorLabel:
-            let target = (action.params["color"]?.stringValue ?? "").lowercased()
+            let target = (action.params[ActionParam.color]?.stringValue ?? "").lowercased()
             return FinderTags.currentColorName(path) != target
         case .addTag:
             let existing = FinderTags.read(path)
@@ -373,7 +373,7 @@ public enum ActionExecutor {
             let existing = FinderTags.read(path)
             return paramTags(action).contains { existing.contains($0) }
         case .rename:
-            let pattern = action.params["pattern"]?.stringValue ?? ""
+            let pattern = action.params[ActionParam.pattern]?.stringValue ?? ""
             guard let newName = try? applyRenamePattern(pattern, path: path) else { return true }
             return (path as NSString).lastPathComponent != newName
         case .moveToFolder, .copyToFolder, .moveToTrash, .delete, .runScript:
@@ -382,9 +382,10 @@ public enum ActionExecutor {
     }
 
     private static func paramTags(_ action: Action) -> [String] {
-        if let tags = action.params["tags"]?.arrayValue {
+        if let tags = action.params[ActionParam.tags]?.arrayValue {
             return tags.compactMap(\.stringValue)
         }
+        // Legacy single-tag param from older saved rules.
         if let tag = action.params["tag"]?.stringValue {
             return [tag]
         }

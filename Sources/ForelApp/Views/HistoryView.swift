@@ -194,7 +194,7 @@ private struct HistoryRow: View {
     }
 
     private var label: String {
-        ConditionEditorLabels.actionKinds.first { $0.0 == entry.actionKind }?.1 ?? entry.actionKind.rawValue
+        entry.actionKind.label
     }
 
     private var statusBadge: some View {
@@ -226,14 +226,6 @@ private struct HistoryRow: View {
     }
 
     private var icon: String {
-        switch entry.actionKind {
-        case .moveToFolder: return "arrow.right.doc.on.clipboard"
-        case .copyToFolder: return "doc.on.doc"
-        case .rename: return "pencil"
-        case .moveToTrash, .delete: return "trash"
-        case .addTag, .removeTag: return "tag"
-        case .setColorLabel: return "paintpalette"
-        case .runScript: return "terminal"
-        }
+        entry.actionKind.iconSystemName
     }
 }

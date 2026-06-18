@@ -1,0 +1,53 @@
+included:
+  - Sources
+  - Tests
+
+excluded:
+  - .build
+  - dist
+
+disabled_rules:
+  # The codebase consistently uses trailing commas in multi-line literals;
+  # that's a style choice, not a correctness issue.
+  - trailing_comma
+  # Force-try is used deliberately in a couple of fail-fast spots (app init,
+  # test fixtures) where there's no recovery path anyway.
+  - force_try
+
+# The existing code style favors long single-line closures/signatures;
+# match that instead of fighting it on every file.
+line_length:
+  warning: 180
+  error: 220
+
+identifier_name:
+  min_length: 2
+  excluded:
+    # Trailing underscore to dodge a Swift keyword (`operator`, `extension`);
+    # SQLITE_TRANSIENT mirrors the C SQLite constant name as-is.
+    - operator_
+    - extension_
+    - SQLITE_TRANSIENT
+
+# Raised from the defaults to stop flagging the existing rule-matching
+# switch and the Database wrapper as errors; still warns if either grows
+# noticeably further.
+cyclomatic_complexity:
+  warning: 20
+  error: 40
+
+type_body_length:
+  warning: 400
+  error: 500
+
+# The rule engine returns a few small internal result tuples (e.g. the
+# action-execution outcome) that carry more than two members on purpose.
+large_tuple:
+  warning: 4
+  error: 6
+
+# The action executor's `plan`/`execute` are flat switches over every action
+# kind; they're long but linear, not complex.
+function_body_length:
+  warning: 80
+  error: 140
