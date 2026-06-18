@@ -26,6 +26,7 @@ All notable changes to Forel are documented here. Format loosely follows
 - The History view now groups activity by batch and file, shows full
   original path -> result path flow, and displays explicit status badges.
 - Size conditions now default to MB instead of bytes.
+- Crisper, better-sized menu bar icon.
 
 ### Fixed
 - Fixed the "Update available" banner text getting cut off in the menu bar

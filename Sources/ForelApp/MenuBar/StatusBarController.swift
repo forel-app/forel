@@ -74,16 +74,16 @@ final class StatusBarController: NSObject {
         WindowActivation.activate(targetWindow)
     }
 
-    /// Menu bar glyph: the white Forel leaf, with a colour dot composited in
-    /// the bottom-right corner (watching/paused) and, when an update is
-    /// available, a larger orange badge with a white ring overlapping the
-    /// top-right corner so it reads at a glance. Always white (not
+    /// Menu bar glyph: a crisp vector `leaf.fill` SF Symbol, with a colour dot
+    /// composited in the bottom-right corner (watching/paused) and, when an
+    /// update is available, a larger orange badge with a white ring overlapping
+    /// the top-right corner so it reads at a glance. Always white (not
     /// template-tinted), per the app's dark menu-bar styling.
     private static func glyph(paused: Bool, updateAvailable: Bool, size: CGFloat = 18) -> NSImage {
         let image = NSImage(size: NSSize(width: size, height: size))
         image.lockFocus()
-        if let tray = AppIcons.trayGlyph {
-            tray.draw(in: NSRect(x: 0, y: 0, width: size, height: size), from: .zero, operation: .sourceOver, fraction: 1)
+        if let leaf = leafGlyph(size: size) {
+            leaf.draw(in: NSRect(x: 0, y: 0, width: size, height: size), from: .zero, operation: .sourceOver, fraction: 1)
         } else {
             NSColor.white.setFill()
             NSBezierPath(roundedRect: NSRect(x: 2, y: 2, width: size - 4, height: size - 4), xRadius: 3, yRadius: 3).fill()
@@ -102,6 +102,34 @@ final class StatusBarController: NSObject {
                 from: .zero, operation: .sourceOver, fraction: 1
             )
         }
+        image.unlockFocus()
+        return image
+    }
+
+    /// White-tinted `leaf.fill` SF Symbol sized to the menu bar. Drawn as a
+    /// template (alpha mask) then filled white, so it stays crisp at any scale
+    /// and Retina factor instead of the old up-scaled raster PNG.
+    private static func leafGlyph(size: CGFloat) -> NSImage? {
+        // Render the leaf smaller than its box so it matches the visual weight
+        // of the system menu bar glyphs around it (which don't fill their box).
+        let glyphPointSize = size * 0.78
+        let config = NSImage.SymbolConfiguration(pointSize: glyphPointSize, weight: .regular)
+        guard let symbol = NSImage(systemSymbolName: "leaf.fill", accessibilityDescription: "Forel")?
+            .withSymbolConfiguration(config) else { return nil }
+        symbol.isTemplate = true
+
+        let drawSize = symbol.size
+        let image = NSImage(size: NSSize(width: size, height: size))
+        image.lockFocus()
+        let rect = NSRect(
+            x: (size - drawSize.width) / 2,
+            y: (size - drawSize.height) / 2,
+            width: drawSize.width,
+            height: drawSize.height
+        )
+        symbol.draw(in: rect)
+        NSColor.white.set()
+        NSRect(x: 0, y: 0, width: size, height: size).fill(using: .sourceAtop)
         image.unlockFocus()
         return image
     }
