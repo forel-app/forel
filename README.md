@@ -182,21 +182,24 @@ Run tells you why.
 | Type | Formats | Limits |
 |------|---------|--------|
 | Plain text | `.txt` `.md` `.csv` `.tsv` `.json` `.xml` `.yaml` `.yml` `.html` `.css` `.js` `.ts` `.swift` `.rs` `.py` `.rb` `.go` `.java` `.c` `.cpp` `.h` `.log`, plus any other text file (`.ini`, `.conf`, no extension, …) | 50 MB |
-| PDF | `.pdf` | 100 MB / 100 pages |
+| PDF | `.pdf` (text layer, or OCR for scanned PDFs) | 100 MB / 100 pages · OCR 20 pages |
 | Rich text | `.rtf` `.rtfd` | — |
 | Word | `.doc` `.docx` | — |
 | Excel | `.xlsx` | 100 MB |
 | PowerPoint | `.pptx` | 100 MB |
+| Apple iWork | `.pages` `.numbers` `.key` | 100 MB |
 | Images (OCR) | `.png` `.jpg` `.jpeg` `.heic` `.tiff` `.tif` | 25 MB / 12000 px |
-| Spotlight fallback | `.xls` `.ppt` `.pages` `.numbers` `.key` `.odt` `.ods` `.odp` `.epub` | `contains` only |
+| Spotlight fallback | `.xls` `.ppt` `.odt` `.ods` `.odp` `.epub` | `contains` only |
 
 > [!NOTE]
+> **Apple iWork** files are read from the preview the app saves inside the
+> document; one saved without a preview falls back to Spotlight.
+>
 > The **Spotlight fallback** is used for formats Forel can't read directly. It
 > relies on macOS having already indexed the file and can only answer the
 > `contains` operator (not `is`, `starts with`, regex, …). When a file isn't
 > indexed, it simply doesn't match.
 >
-> Scanned PDFs (no text layer) are not yet supported and are on the roadmap.
 > Unsupported files simply don't match the Contents condition.
 
 ---

@@ -25,12 +25,12 @@ import ZIPFoundation
 public enum ContentStrategy: String, Sendable {
     case plainText
     case pdfText
-    case pdfOCR          // Phase 2 (scanned PDFs)
+    case pdfOCR
     case rtf
     case officeDocument  // .doc / .docx via AppKit
     case xlsx
     case pptx
-    case iWork           // Phase 2
+    case iWork
     case officeLegacy    // Phase 2
     case spotlight
     case imageOCR
@@ -75,6 +75,8 @@ public enum ContentExtractor {
     private static let plainTextMaxBytes: UInt64 = 50 * 1024 * 1024
     private static let pdfMaxBytes: UInt64 = 100 * 1024 * 1024
     private static let pdfMaxPages = 100
+    private static let pdfOCRMaxPages = 20
+    private static let pdfOCRRenderScale: CGFloat = 2.0
     private static let ocrImageMaxBytes: UInt64 = 25 * 1024 * 1024
     private static let ocrMaxDimension = 12_000
     private static let officeZipMaxBytes: UInt64 = 100 * 1024 * 1024
@@ -117,6 +119,8 @@ public enum ContentExtractor {
             return extractXLSX(path: path, size: size)
         case "pptx":
             return extractPPTX(path: path, size: size)
+        case "pages", "numbers", "key":
+            return extractIWork(path: path, size: size)
         default:
             if imageExtensions.contains(ext) {
                 return extractImageOCR(path: path, size: size)
@@ -221,6 +225,20 @@ public enum ContentExtractor {
         guard let doc = PDFDocument(url: URL(fileURLWithPath: path)) else {
             return ContentExtraction(text: nil, strategy: .none, message: "Could not open PDF.")
         }
+        let text = pdfText(from: doc)
+        if !text.isEmpty {
+            return ContentExtraction(text: text, strategy: .pdfText)
+        }
+        // No text layer — likely a scanned PDF. OCR the rendered pages.
+        let ocr = pdfOCRText(from: doc)
+        if !ocr.isEmpty {
+            return ContentExtraction(text: ocr, strategy: .pdfOCR)
+        }
+        return ContentExtraction(text: nil, strategy: .none, message: "PDF has no readable text.")
+    }
+
+    /// Concatenates the text layer of a PDF document, up to the page limit.
+    private static func pdfText(from doc: PDFDocument) -> String {
         let pageCount = min(doc.pageCount, pdfMaxPages)
         var parts: [String] = []
         for index in 0..<pageCount {
@@ -228,12 +246,41 @@ public enum ContentExtractor {
                 parts.append(text)
             }
         }
-        let text = parts.joined(separator: "\n")
-        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            // No text layer — likely a scanned PDF. PDF OCR is Phase 2.
-            return ContentExtraction(text: nil, strategy: .none, message: "PDF has no readable text layer.")
+        return parts.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// OCRs a scanned PDF by rendering each page to a bitmap and running Vision,
+    /// up to a tighter page limit since this is far more expensive than reading
+    /// a text layer.
+    private static func pdfOCRText(from doc: PDFDocument) -> String {
+        let pageCount = min(doc.pageCount, pdfOCRMaxPages)
+        var parts: [String] = []
+        for index in 0..<pageCount {
+            guard let page = doc.page(at: index),
+                  let cgImage = renderPDFPage(page),
+                  let text = recognizeText(in: cgImage) else { continue }
+            parts.append(text)
         }
-        return ContentExtraction(text: text, strategy: .pdfText)
+        return parts.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Renders a PDF page to a bitmap `CGImage` for OCR, scaled up for accuracy.
+    private static func renderPDFPage(_ page: PDFPage) -> CGImage? {
+        let bounds = page.bounds(for: .mediaBox)
+        let width = Int(bounds.width * pdfOCRRenderScale)
+        let height = Int(bounds.height * pdfOCRRenderScale)
+        guard width > 0, height > 0,
+              let context = CGContext(
+                data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              ) else { return nil }
+        // White background so OCR sees dark-on-light text.
+        context.setFillColor(gray: 1, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        context.scaleBy(x: pdfOCRRenderScale, y: pdfOCRRenderScale)
+        context.translateBy(x: -bounds.origin.x, y: -bounds.origin.y)
+        page.draw(with: .mediaBox, to: context)
+        return context.makeImage()
     }
 
     // MARK: - AppKit documents (RTF / Word)
@@ -318,6 +365,52 @@ public enum ContentExtractor {
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    // MARK: - Apple iWork (.pages / .numbers / .key)
+
+    /// iWork stores its real content in a proprietary binary format we can't
+    /// parse, but documents almost always embed a `QuickLook/Preview.pdf` — the
+    /// rendered preview — whose text layer we read with PDFKit. Handles both the
+    /// flat-file (zip) and package (directory) on-disk shapes. When there's no
+    /// preview, the evaluator can still fall back to Spotlight for `contains`.
+    private static func extractIWork(path: String, size: UInt64) -> ContentExtraction {
+        if size > officeZipMaxBytes {
+            return ContentExtraction(text: nil, strategy: .none, message: "iWork document exceeds the 100 MB limit.")
+        }
+        guard let pdfData = iWorkPreviewPDF(path: path), let doc = PDFDocument(data: pdfData) else {
+            return ContentExtraction(text: nil, strategy: .none, message: "iWork preview not available.")
+        }
+        let text = pdfText(from: doc)
+        if text.isEmpty {
+            return ContentExtraction(text: nil, strategy: .none, message: "iWork preview has no readable text.")
+        }
+        return ContentExtraction(text: text, strategy: .iWork)
+    }
+
+    /// Returns the bytes of the document's `QuickLook/Preview.pdf`, whether the
+    /// iWork file is a single zip archive or an on-disk package (directory).
+    private static func iWorkPreviewPDF(path: String) -> Data? {
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) else { return nil }
+        if isDirectory.boolValue {
+            let preview = (path as NSString).appendingPathComponent("QuickLook/Preview.pdf")
+            return try? Data(contentsOf: URL(fileURLWithPath: preview))
+        }
+        return zipMemberData(path: path) { $0.lowercased().hasSuffix("quicklook/preview.pdf") }
+    }
+
+    /// Reads the bytes of the first archive member whose path satisfies
+    /// `matching`. Used for binary members (e.g. an embedded PDF), unlike
+    /// `zipText` which decodes to text.
+    private static func zipMemberData(path: String, matching: (String) -> Bool) -> Data? {
+        guard let archive = try? Archive(url: URL(fileURLWithPath: path), accessMode: .read, pathEncoding: nil) else { return nil }
+        for entry in archive where matching(entry.path) {
+            var data = Data()
+            guard (try? archive.extract(entry, skipCRC32: true, consumer: { data.append($0) })) != nil else { continue }
+            if !data.isEmpty { return data }
+        }
+        return nil
+    }
+
     // MARK: - Image OCR
 
     private static func extractImageOCR(path: String, size: UInt64) -> ContentExtraction {
@@ -332,21 +425,28 @@ public enum ContentExtractor {
         if cgImage.width > ocrMaxDimension || cgImage.height > ocrMaxDimension {
             return ContentExtraction(text: nil, strategy: .none, message: "Image is too large for OCR.")
         }
+        guard let text = recognizeText(in: cgImage) else {
+            return ContentExtraction(text: nil, strategy: .none, message: "No text found in image.")
+        }
+        return ContentExtraction(text: text, strategy: .imageOCR)
+    }
 
+    /// Runs on-device Vision text recognition on a bitmap, returning the joined
+    /// lines or `nil` when nothing is recognized (or OCR is unavailable). Shared
+    /// by image and scanned-PDF extraction.
+    private static func recognizeText(in cgImage: CGImage) -> String? {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-        guard (try? handler.perform([request])) != nil,
-              let observations = request.results else {
-            return ContentExtraction(text: nil, strategy: .none, message: "OCR is unavailable.")
+        guard (try? handler.perform([request])) != nil, let observations = request.results else {
+            return nil
         }
-        let lines = observations.compactMap { $0.topCandidates(1).first?.string }
-        let text = lines.joined(separator: "\n")
-        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return ContentExtraction(text: nil, strategy: .none, message: "No text found in image.")
-        }
-        return ContentExtraction(text: text, strategy: .imageOCR)
+        let text = observations
+            .compactMap { $0.topCandidates(1).first?.string }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
     }
 
     // MARK: - Helpers

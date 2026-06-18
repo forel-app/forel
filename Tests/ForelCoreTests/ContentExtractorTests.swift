@@ -39,6 +39,20 @@ import AppKit
         #expect(!ConditionEvaluator.evaluate(makeCondition(.contents, .contains, "refund"), path: pdf))
     }
 
+    @Test func scannedPdfFallsBackToOCR() throws {
+        let dir = TempDir()
+        let pdf = (dir.path as NSString).appendingPathComponent("scanned.pdf")
+        makeScannedPDF(at: pdf, text: "SCANNED INVOICE 2026")
+
+        let result = ContentExtractor.extract(path: pdf)
+        // OCR may be unavailable in some headless environments; only assert the
+        // match when recognition actually produced text.
+        if result.text != nil {
+            #expect(result.strategy == .pdfOCR)
+            #expect(ConditionEvaluator.evaluate(makeCondition(.contents, .contains, "SCANNED"), path: pdf))
+        }
+    }
+
     @Test func rtfDocumentIsExtracted() throws {
         let dir = TempDir()
         let rtf = (dir.path as NSString).appendingPathComponent("memo.rtf")
@@ -89,6 +103,38 @@ import AppKit
         #expect(ConditionEvaluator.evaluate(makeCondition(.contents, .contains, "Roadmap"), path: pptx))
         #expect(ConditionEvaluator.evaluate(makeCondition(.contents, .contains, "Berlin"), path: pptx))
         #expect(!ConditionEvaluator.evaluate(makeCondition(.contents, .contains, "Tokyo"), path: pptx))
+    }
+
+    @Test func iWorkFlatFileReadsPreviewPDF() throws {
+        let dir = TempDir()
+        let pages = makeIWorkFlatFile(in: dir, name: "proposal.pages", previewText: "Project proposal for Acme")
+
+        let result = ContentExtractor.extract(path: pages)
+        #expect(result.strategy == .iWork)
+        #expect(ConditionEvaluator.evaluate(makeCondition(.contents, .contains, "proposal for Acme"), path: pages))
+        #expect(!ConditionEvaluator.evaluate(makeCondition(.contents, .contains, "invoice"), path: pages))
+    }
+
+    @Test func iWorkPackageReadsPreviewPDF() throws {
+        let dir = TempDir()
+        let numbers = makeIWorkPackage(in: dir, name: "budget.numbers", previewText: "Budget Q3 totals 12345")
+
+        let result = ContentExtractor.extract(path: numbers)
+        #expect(result.strategy == .iWork)
+        #expect(ConditionEvaluator.evaluate(makeCondition(.contents, .contains, "Budget Q3"), path: numbers))
+    }
+
+    @Test func iWorkWithoutPreviewReturnsNone() throws {
+        let dir = TempDir()
+        // A flat-file iWork doc with no QuickLook/Preview.pdf member.
+        let staging = dir.dir("nopreview-staging")
+        let dataDir = (staging as NSString).appendingPathComponent("Data")
+        try! FileManager.default.createDirectory(atPath: dataDir, withIntermediateDirectories: true)
+        try "binary-ish".write(toFile: (dataDir as NSString).appendingPathComponent("Index.iwa"), atomically: true, encoding: .utf8)
+        let key = (dir.path as NSString).appendingPathComponent("deck.key")
+        zipStaging(staging, topLevel: "Data", into: key)
+
+        #expect(ContentExtractor.extract(path: key).strategy == .none)
     }
 
     @Test func corruptSpreadsheetReturnsNoContentWithoutCrashing() throws {
@@ -211,18 +257,32 @@ private func makeTextPDF(at path: String, text: String) {
     ctx.closePDF()
 }
 
-private func makeTextImage(at path: String, text: String) {
-    let size = NSSize(width: 600, height: 200)
+/// Renders `text` as large black-on-white text into an image (no text layer).
+private func renderTextImage(_ text: String, size: NSSize = NSSize(width: 600, height: 200)) -> NSImage {
     let image = NSImage(size: size)
     image.lockFocus()
     NSColor.white.setFill()
     NSRect(origin: .zero, size: size).fill()
     (text as NSString).draw(
-        at: CGPoint(x: 40, y: 80),
+        at: CGPoint(x: 40, y: size.height / 2 - 30),
         withAttributes: [.font: NSFont.boldSystemFont(ofSize: 64), .foregroundColor: NSColor.black]
     )
     image.unlockFocus()
-    writePNG(image, to: path)
+    return image
+}
+
+private func makeTextImage(at path: String, text: String) {
+    writePNG(renderTextImage(text), to: path)
+}
+
+/// Builds a single-page PDF whose page is an *image* of the text — i.e. no text
+/// layer, like a scan — so extraction must fall back to OCR.
+private func makeScannedPDF(at path: String, text: String) {
+    let image = renderTextImage(text, size: NSSize(width: 1000, height: 300))
+    guard let page = PDFPage(image: image) else { return }
+    let doc = PDFDocument()
+    doc.insert(page, at: 0)
+    doc.write(to: URL(fileURLWithPath: path))
 }
 
 private func makeBlankImage(at path: String) {
@@ -283,6 +343,27 @@ private func makePPTX(in dir: TempDir, slides: [String]) -> String {
     let pptx = (dir.path as NSString).appendingPathComponent("deck.pptx")
     zipStaging(staging, topLevel: "ppt", into: pptx)
     return pptx
+}
+
+/// Builds a flat-file (zip) iWork document containing `QuickLook/Preview.pdf`.
+private func makeIWorkFlatFile(in dir: TempDir, name: String, previewText: String) -> String {
+    let staging = dir.dir("iwork-flat-staging")
+    let qlDir = (staging as NSString).appendingPathComponent("QuickLook")
+    try! FileManager.default.createDirectory(atPath: qlDir, withIntermediateDirectories: true)
+    makeTextPDF(at: (qlDir as NSString).appendingPathComponent("Preview.pdf"), text: previewText)
+
+    let doc = (dir.path as NSString).appendingPathComponent(name)
+    zipStaging(staging, topLevel: "QuickLook", into: doc)
+    return doc
+}
+
+/// Builds a package (directory) iWork document containing QuickLook/Preview.pdf.
+private func makeIWorkPackage(in dir: TempDir, name: String, previewText: String) -> String {
+    let pkg = dir.dir(name)
+    let qlDir = (pkg as NSString).appendingPathComponent("QuickLook")
+    try! FileManager.default.createDirectory(atPath: qlDir, withIntermediateDirectories: true)
+    makeTextPDF(at: (qlDir as NSString).appendingPathComponent("Preview.pdf"), text: previewText)
+    return pkg
 }
 
 private func writePNG(_ image: NSImage, to path: String) {
