@@ -3,7 +3,7 @@
 All notable changes to Forel are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.1.0-beta.3] - 2026-06-18
 
 ### Added
 - Dry Run now shows detailed per-file rule previews, including matched
