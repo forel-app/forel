@@ -194,12 +194,9 @@ Please read the repository guidelines before submitting. Bug reports, feature re
 
 ## License
 
-GPLv3 — see [LICENSE](LICENSE) for details.
+The source code is licensed under **GPL-3.0-or-later**, copyright © 2026 lab421 — see [LICENSE](LICENSE). That license covers the source code only.
 
-Copyright (C) 2026 Lionel Guichard. This program is free software: you can
-redistribute it and/or modify it under the terms of the GNU General Public
-License as published by the Free Software Foundation, either version 3 of the
-License, or (at your option) any later version.
+The **Forel** name, logo, and look are **not** covered by the GPL and are protected separately — see [TRADEMARKS.md](TRADEMARKS.md).
 
 ---
 
