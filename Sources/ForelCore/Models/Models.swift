@@ -4,12 +4,14 @@ public struct WatchedFolder: Codable, Equatable, Sendable {
     public var id: String
     public var path: String
     public var enabled: Bool
+    public var priority: Int64
     public var createdAt: String
 
-    public init(id: String = UUID().uuidString, path: String, enabled: Bool = true, createdAt: String = ISO8601DateFormatter().string(from: Date())) {
+    public init(id: String = UUID().uuidString, path: String, enabled: Bool = true, priority: Int64 = 0, createdAt: String = ISO8601DateFormatter().string(from: Date())) {
         self.id = id
         self.path = path
         self.enabled = enabled
+        self.priority = priority
         self.createdAt = createdAt
     }
 }
@@ -85,6 +87,7 @@ public enum ActionKind: String, Codable, Equatable, Sendable {
     case removeTag = "remove_tag"
     case setColorLabel = "set_color_label"
     case runScript = "run_script"
+    case runShortcut = "run_shortcut"
 
     public init(dbValue: String) {
         self = ActionKind(rawValue: dbValue) ?? .moveToFolder

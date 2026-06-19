@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func configure(model: AppModel, updater: UpdaterManager) {
         self.model = model
         self.updater = updater
+        model.applyDockIconPreference()
         configureMainWindow()
         if statusBarController == nil {
             setUpStatusBar()
@@ -59,6 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if let window = NSApp.windows.first {
             configureMainWindow(window)
         }
+        model?.applyDockIconPreference()
         if model != nil, updater != nil {
             setUpStatusBar()
         }
@@ -119,10 +121,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // accessory policy switch itself needs a moment to take effect)
         // matches what `WindowActivationBridge` already does elsewhere.
         DispatchQueue.main.async {
-            WindowActivation.activate(targetWindow)
+            WindowActivation.activate(targetWindow, showsDockIcon: self.model?.showDockIcon != false)
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            WindowActivation.activate(targetWindow)
+            WindowActivation.activate(targetWindow, showsDockIcon: self.model?.showDockIcon != false)
         }
     }
 

@@ -1,6 +1,7 @@
 import Foundation
 import ForelCore
 import Combine
+import AppKit
 
 /// Central observable state for the SwiftUI app: owns the database, the
 /// watcher coordinator, and the in-memory view of folders/rules. Mirrors the
@@ -16,10 +17,12 @@ final class AppModel: ObservableObject {
     @Published var rules: [Rule] = []
     @Published var history: [HistoryEntry] = []
     @Published var paused: Bool = false
+    @Published var alertTitle: String = "Error"
     @Published var errorMessage: String?
     @Published var detailRoute: DetailRoute = .rules
     @Published var appTheme: AppTheme = .system
     @Published var accentPreset: AccentPreset = .default
+    @Published var showDockIcon: Bool = true
     /// Bumped whenever the accent colour changes, so views can force a full
     /// re-render with `.id(model.accentVersion)` — `ForelTheme.accent` is a
     /// plain static var, not itself observable.
@@ -58,8 +61,51 @@ final class AppModel: ObservableObject {
         let storedTheme = (try? db.getSetting("theme")) ?? nil
         self.appTheme = storedTheme.flatMap(AppTheme.init(rawValue:)) ?? .system
 
+        let storedShowDockIcon = try? db.getSetting("show_dock_icon")
+        self.showDockIcon = storedShowDockIcon.map { $0 == "1" } ?? true
+
         reloadFolders()
         startWatchingEnabledFolders()
+    }
+
+    func applyDockIconPreference(keepingWindowsVisible: Bool = false) {
+        let visibleWindows = NSApp.windows.filter { window in
+            window.isVisible && !(window is NSPanel)
+        }
+        let keyWindow = NSApp.keyWindow
+
+        NSApp.setActivationPolicy(showDockIcon ? .regular : .accessory)
+
+        guard keepingWindowsVisible else { return }
+
+        let windowsToRestore = visibleWindows.isEmpty
+            ? NSApp.windows.filter { !($0 is NSPanel) }
+            : visibleWindows
+
+        let restoreWindows = {
+            for window in windowsToRestore {
+                window.makeKeyAndOrderFront(nil)
+                window.orderFrontRegardless()
+            }
+            keyWindow?.makeKeyAndOrderFront(nil)
+            NSApp.activate()
+        }
+
+        restoreWindows()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            for window in windowsToRestore {
+                window.makeKeyAndOrderFront(nil)
+                window.orderFrontRegardless()
+            }
+            keyWindow?.makeKeyAndOrderFront(nil)
+            NSApp.activate()
+        }
+    }
+
+    func setShowDockIcon(_ enabled: Bool) {
+        showDockIcon = enabled
+        try? db.setSetting("show_dock_icon", enabled ? "1" : "0")
+        applyDockIconPreference(keepingWindowsVisible: true)
     }
 
     func setAppTheme(_ theme: AppTheme) {
@@ -102,13 +148,25 @@ final class AppModel: ObservableObject {
     }
 
     func addFolder(path: String) {
-        let folder = WatchedFolder(path: path)
+        let normalizedPath = (path as NSString).standardizingPath
+        if let existingFolder = folders.first(where: { ($0.path as NSString).standardizingPath == normalizedPath }) {
+            selectedFolderId = existingFolder.id
+            detailRoute = .rules
+            reloadRules()
+            showNotice(
+                title: "Folder already watched",
+                message: "\"\((existingFolder.path as NSString).lastPathComponent)\" is already in your watched folders."
+            )
+            return
+        }
+
+        let folder = WatchedFolder(path: normalizedPath)
         do {
             try db.insertFolder(folder)
-            if !paused { coordinator.add(path) }
+            if !paused { coordinator.add(normalizedPath) }
             reloadFolders()
         } catch {
-            errorMessage = "\(error)"
+            showError(error)
         }
     }
 
@@ -128,6 +186,11 @@ final class AppModel: ObservableObject {
         reloadFolders()
     }
 
+    func reorderFolders(_ folderIds: [String]) {
+        try? db.reorderFolders(folderIds)
+        reloadFolders()
+    }
+
     func saveRule(_ rule: Rule) {
         do {
             if rules.contains(where: { $0.id == rule.id }) {
@@ -137,7 +200,7 @@ final class AppModel: ObservableObject {
             }
             reloadRules()
         } catch {
-            errorMessage = "\(error)"
+            showError(error)
         }
     }
 
@@ -241,7 +304,7 @@ final class AppModel: ObservableObject {
             try db.markHistoryUndone(entry.id)
             reloadHistory()
         } catch {
-            errorMessage = "\(error)"
+            showError(error)
         }
     }
 
@@ -265,7 +328,7 @@ final class AppModel: ObservableObject {
         }
 
         if !failures.isEmpty {
-            errorMessage = "Some actions could not be undone:\n" + failures.joined(separator: "\n")
+            showError("Some actions could not be undone:\n" + failures.joined(separator: "\n"))
         }
         reloadHistory()
     }
@@ -281,5 +344,19 @@ final class AppModel: ObservableObject {
                 coordinator.add(folder.path)
             }
         }
+    }
+
+    private func showNotice(title: String, message: String) {
+        alertTitle = title
+        errorMessage = message
+    }
+
+    private func showError(_ error: any Error) {
+        showError("\(error)")
+    }
+
+    private func showError(_ message: String) {
+        alertTitle = "Error"
+        errorMessage = message
     }
 }

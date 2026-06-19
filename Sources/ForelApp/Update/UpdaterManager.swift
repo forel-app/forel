@@ -39,7 +39,7 @@ final class UpdaterManager: ObservableObject {
         }
     }
 
-    private static let repo = "forel-app/forel"
+    private static let repo = "lab421/forel"
     private static let checkInterval: TimeInterval = 12 * 60 * 60
     private static let settingKey = "auto_update_checks"
 

@@ -8,8 +8,8 @@
 
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-black?style=flat-square&logo=apple)](https://www.apple.com/macos/)
 [![Swift 6](https://img.shields.io/badge/Swift-6-orange?style=flat-square&logo=swift)](https://www.swift.org)
-[![Downloads](https://img.shields.io/github/downloads/forel-app/forel/total?style=flat-square)](https://github.com/forel-app/forel/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![Downloads](https://img.shields.io/github/downloads/lab421/forel/total?style=flat-square)](https://github.com/lab421/forel/releases)
+[![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue?style=flat-square)](LICENSE)
 
 <br/>
 
@@ -27,7 +27,7 @@ This project is built and maintained for free, on personal time. A ⭐ on the re
 **Install with [Homebrew](https://brew.sh):**
 
 ```sh
-brew install --cask forel-app/tap/forel
+brew install --cask lab421/tap/forel
 ```
 
 ## Why Forel
@@ -58,7 +58,7 @@ And everything happens **on your Mac**. No cloud. No API keys. No subscription. 
 
 ## Highlights
 
-- **Free & open source** — no license fee, no subscription, MIT-licensed.
+- **Free & open source** — no license fee, no subscription, GPLv3-licensed.
 - **100% on-device** — no cloud, no API keys, no account. Your files never leave your Mac.
 - **Rule-based** — match by name, extension, kind, size, date, tags, or color label.
 - **Native menu-bar app** — runs quietly in the background; toggle rules without opening the window.
@@ -81,26 +81,26 @@ And everything happens **on your Mac**. No cloud. No API keys. No subscription. 
 ### Homebrew
 
 ```bash
-brew install --cask forel-app/tap/forel
+brew install --cask lab421/tap/forel
 ```
 
 or
 
 ```bash
-brew tap forel-app/tap
+brew tap lab421/tap
 brew install --cask forel
 ```
 
 ### Manual
 
-Download the latest release `.dmg` from the [Releases](https://github.com/forel-app/forel/releases) page, open it, and drag Forel to your Applications folder.
+Download the latest release `.dmg` from the [Releases](https://github.com/lab421/forel/releases) page, open it, and drag Forel to your Applications folder.
 
 ### Build from source
 
 **Prerequisites:** [Swift 6](https://www.swift.org) · macOS 14 or later
 
 ```bash
-git clone https://github.com/forel-app/forel.git
+git clone https://github.com/lab421/forel.git
 cd forel
 swift build
 swift test
@@ -162,12 +162,13 @@ forel/
 - [x] Action history & undo
 - [x] Automatic updates
 - [x] Preferences: launch at login
+- [x] Shortcuts actions
+- [x] Drag & drop to reorder rules
+- [x] Rules based metadata files
 - [ ] Sync actions
 - [ ] Upload actions
 - [ ] Native notifications on rule actions
 - [ ] Activity logs
-- [ ] Drag & drop to reorder rules
-- [x] Rules based metadata files
 - [ ] Shortcuts integration
 - [ ] Automatic cleaning database
 - [ ] AI features
@@ -215,7 +216,7 @@ Run tells you why.
 Forel is in early development and contributions are very welcome.
 
 ```bash
-git clone https://github.com/forel-app/forel.git
+git clone https://github.com/lab421/forel.git
 cd forel
 swift build
 swift test
@@ -227,7 +228,21 @@ Please read the repository guidelines before submitting. Bug reports, feature re
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+The source code is licensed under **GPL-3.0-or-later**, copyright © 2026 lab421 — see [LICENSE](LICENSE). That license covers the source code only.
+
+The **Forel** name, logo, and look are **not** covered by the GPL and are protected separately — see [TRADEMARKS.md](TRADEMARKS.md).
+
+---
+
+## Star History
+
+<a href="https://star-history.com/#lab421/forel&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=lab421/forel&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=lab421/forel&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=lab421/forel&type=Date" />
+  </picture>
+</a>
 
 ---
 

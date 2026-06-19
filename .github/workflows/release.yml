@@ -1,6 +1,6 @@
 name: Release
 
-# Required to publish the Homebrew cask to forel-app/homebrew-tap:
+# Required to publish the Homebrew cask to lab421/homebrew-tap:
 #   HOMEBREW_TAP_TOKEN (a PAT with `contents: write` on that repo)
 
 on:
@@ -117,7 +117,7 @@ jobs:
       - name: Checkout homebrew-tap
         uses: actions/checkout@v4
         with:
-          repository: forel-app/homebrew-tap
+          repository: lab421/homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: homebrew-tap
 
@@ -136,10 +136,10 @@ jobs:
             sha256 arm:   "${arm_sha}",
                    intel: "${intel_sha}"
 
-            url "https://github.com/forel-app/forel/releases/download/v#{version}/Forel-v#{version}-darwin-#{arch}.dmg"
+            url "https://github.com/lab421/forel/releases/download/v#{version}/Forel-v#{version}-darwin-#{arch}.dmg"
             name "Forel"
             desc "File-automation app that watches folders and runs rules"
-            homepage "https://github.com/forel-app/forel"
+            homepage "https://github.com/lab421/forel"
 
             livecheck do
               url :url
