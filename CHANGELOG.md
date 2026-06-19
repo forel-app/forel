@@ -6,7 +6,7 @@ All notable changes to Forel are documented here. Format loosely follows
 ## [Unreleased]
 
 ### Added
-- Added a Run Shortcut rule action that lists macOS Shortcuts and runs the selected shortcut with the matched file as input.
+- Added a Run Shortcut rule action that lists macOS Shortcuts and lets each action choose matched-file or no-input mode.
 
 ## [0.1.0-beta.4] - 2026-06-18
 

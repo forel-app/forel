@@ -562,6 +562,7 @@ private struct KindValuePicker: View {
 private struct ActionRow: View {
     @Binding var action: Action
     let onDelete: () -> Void
+    @State private var showingOptions = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -574,8 +575,22 @@ private struct ActionRow: View {
             .frame(width: 190)
 
             actionParams
-                .frame(width: 420, alignment: .leading)
+                .frame(width: 380, alignment: .leading)
                 .frame(minHeight: 32)
+
+            Button {
+                showingOptions.toggle()
+            } label: {
+                Image(systemName: "ellipsis")
+            }
+            .buttonStyle(IconButtonStyle())
+            .help("Action options")
+            .frame(width: 28)
+            .popover(isPresented: $showingOptions, arrowEdge: .bottom) {
+                ActionOptionsView(action: $action)
+                    .padding(14)
+                    .frame(width: 280)
+            }
 
             Button(role: .destructive, action: onDelete) {
                 Image(systemName: "minus")
@@ -651,6 +666,56 @@ private struct ActionRow: View {
                 let normalized = newTags.map { JSONValue.string($0) }
                 dict[ActionParam.tags] = .array(normalized)
                 dict.removeValue(forKey: "tag")
+                action.params = .object(dict)
+            }
+        )
+    }
+}
+
+private struct ActionOptionsView: View {
+    @Binding var action: Action
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Options")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(ForelTheme.primaryText)
+
+            switch action.kind {
+            case .runShortcut:
+                shortcutOptions
+            default:
+                Text("No options for this action.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(ForelTheme.secondaryText)
+            }
+        }
+    }
+
+    private var shortcutOptions: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Input")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(ForelTheme.secondaryText)
+
+            Picker("", selection: paramBinding(ActionParam.shortcutInputMode, defaultValue: ShortcutInputMode.matchedFile.rawValue)) {
+                ForEach(ShortcutInputMode.allCases, id: \.rawValue) { mode in
+                    Text(mode.label).tag(mode.rawValue)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func paramBinding(_ key: String, defaultValue: String = "") -> Binding<String> {
+        Binding(
+            get: { action.params[key]?.stringValue ?? defaultValue },
+            set: { newValue in
+                var dict: [String: JSONValue] = [:]
+                if case .object(let existing) = action.params { dict = existing }
+                dict[key] = .string(newValue)
                 action.params = .object(dict)
             }
         )

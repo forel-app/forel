@@ -71,6 +71,18 @@ public struct Applied {
     public let undo: Undo
 }
 
+public enum ShortcutInputMode: String, CaseIterable, Sendable {
+    case matchedFile = "matched_file"
+    case none
+
+    public var label: String {
+        switch self {
+        case .matchedFile: return "Matched file"
+        case .none: return "No input"
+        }
+    }
+}
+
 public enum DryRunStatus: String, Codable, Equatable, Sendable {
     case wouldRun = "would_run"
     case wouldSkip = "would_skip"
@@ -208,7 +220,8 @@ public enum ActionExecutor {
 
     private static func runShortcut(_ action: Action, path: String) throws -> Applied {
         let name = try stringParam(action, ActionParam.shortcutName, "RunShortcut")
-        try ShortcutRunner.run(name: name, inputPath: path)
+        let inputMode = shortcutInputMode(action)
+        try ShortcutRunner.run(name: name, input: shortcutInput(mode: inputMode, path: path))
         return Applied(newPath: path, undo: .none)
     }
 
@@ -368,9 +381,10 @@ public enum ActionExecutor {
             )
         case .runShortcut:
             let name = action.params[ActionParam.shortcutName]?.stringValue ?? ""
+            let inputMode = shortcutInputMode(action)
             return ActionPlan(
                 kind: action.kind,
-                description: name.isEmpty ? "Run shortcut" : "Run shortcut: \(name)",
+                description: shortcutDescription(name: name, inputMode: inputMode),
                 sourcePath: path,
                 targetPath: nil,
                 status: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .wouldSkip : .wouldRun,
@@ -410,6 +424,33 @@ public enum ActionExecutor {
             return [tag]
         }
         return []
+    }
+
+    public static func shortcutInputMode(_ action: Action) -> ShortcutInputMode {
+        guard let raw = action.params[ActionParam.shortcutInputMode]?.stringValue else {
+            return .matchedFile
+        }
+        return ShortcutInputMode(rawValue: raw) ?? .matchedFile
+    }
+
+    private static func shortcutDescription(name: String, inputMode: ShortcutInputMode) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "Run shortcut" }
+        switch inputMode {
+        case .matchedFile:
+            return "Run shortcut: \(trimmed)"
+        case .none:
+            return "Run shortcut: \(trimmed) with no input"
+        }
+    }
+
+    private static func shortcutInput(mode: ShortcutInputMode, path: String) throws -> ShortcutRunner.Input {
+        switch mode {
+        case .matchedFile:
+            return .file(path)
+        case .none:
+            return .none
+        }
     }
 
     private static func conflictStatus(_ target: String) -> DryRunStatus {
@@ -530,18 +571,22 @@ public enum ShortcutCatalog {
 }
 
 enum ShortcutRunner {
+    enum Input: Equatable {
+        case file(String)
+        case none
+    }
+
     static let executablePath = "/usr/bin/shortcuts"
     private static let defaultTimeout: TimeInterval = 60
 
-    static func run(name: String, inputPath: String, timeout: TimeInterval = defaultTimeout) throws {
+    static func run(name: String, input: Input, timeout: TimeInterval = defaultTimeout) throws {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else {
             throw ActionError("RunShortcut requires '\(ActionParam.shortcutName)' param")
         }
-
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executablePath)
-        process.arguments = ["run", trimmedName, "--input-path", inputPath]
+        process.arguments = arguments(name: trimmedName, input: input)
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
 
@@ -563,5 +608,16 @@ enum ShortcutRunner {
         guard process.terminationStatus == 0 else {
             throw ActionError("shortcut exited with status \(process.terminationStatus)")
         }
+    }
+
+    static func arguments(name: String, input: Input) -> [String] {
+        var args = ["run", name]
+        switch input {
+        case .file(let path):
+            args.append(contentsOf: ["--input-path", path])
+        case .none:
+            break
+        }
+        return args
     }
 }

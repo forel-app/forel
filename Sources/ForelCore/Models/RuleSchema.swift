@@ -161,6 +161,7 @@ public enum ActionParam {
     public static let color = "color"
     public static let script = "script"
     public static let shortcutName = "shortcut_name"
+    public static let shortcutInputMode = "shortcut_input_mode"
 }
 
 /// The abstract shape of an action parameter; the UI maps it to a concrete editor.
