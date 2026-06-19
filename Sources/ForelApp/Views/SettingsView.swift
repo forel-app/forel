@@ -34,6 +34,12 @@ struct SettingsView: View {
                             subtitle: "Open Forel automatically when you log in",
                             isOn: launchAtLoginBinding
                         )
+                        Divider().overlay(ForelTheme.divider).padding(.leading, 14)
+                        ToggleRow(
+                            title: "Show Dock icon",
+                            subtitle: "Keep Forel visible in the Dock while it runs",
+                            isOn: dockIconBinding
+                        )
                     }
 
                     SectionLabel(title: "Updates")
@@ -116,6 +122,10 @@ struct SettingsView: View {
             // saved and applies once running from a packaged build.
             LoginItem.setEnabled(enabled)
         })
+    }
+
+    private var dockIconBinding: Binding<Bool> {
+        Binding(get: { model.showDockIcon }, set: { model.setShowDockIcon($0) })
     }
 
     private var automaticUpdatesBinding: Binding<Bool> {

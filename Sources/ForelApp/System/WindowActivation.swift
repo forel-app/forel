@@ -3,8 +3,8 @@ import SwiftUI
 
 @MainActor
 enum WindowActivation {
-    static func activate(_ window: NSWindow?) {
-        NSApp.setActivationPolicy(.regular)
+    static func activate(_ window: NSWindow?, showsDockIcon: Bool = true) {
+        NSApp.setActivationPolicy(showsDockIcon ? .regular : .accessory)
         window?.makeKeyAndOrderFront(nil)
         window?.orderFrontRegardless()
         NSApp.activate()
@@ -19,17 +19,19 @@ enum WindowActivation {
 }
 
 struct WindowActivationBridge: NSViewRepresentable {
+    let showsDockIcon: Bool
+
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async {
-            WindowActivation.activate(view.window)
+            WindowActivation.activate(view.window, showsDockIcon: showsDockIcon)
         }
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
         DispatchQueue.main.async {
-            WindowActivation.activate(nsView.window)
+            WindowActivation.activate(nsView.window, showsDockIcon: showsDockIcon)
         }
     }
 }

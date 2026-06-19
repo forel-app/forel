@@ -4,6 +4,7 @@ import ForelCore
 
 struct RuleEditorView: View {
     @State private var rule: Rule
+    @EnvironmentObject private var model: AppModel
     let onSave: (Rule) -> Void
     let onCancel: () -> Void
 
@@ -108,7 +109,7 @@ struct RuleEditorView: View {
         .padding(22)
         .frame(width: 760, height: 680)
         .background(ForelTheme.background)
-        .background(WindowActivationBridge())
+        .background(WindowActivationBridge(showsDockIcon: model.showDockIcon))
     }
 
     /// A rule with an unparsable regex would just silently never match at
