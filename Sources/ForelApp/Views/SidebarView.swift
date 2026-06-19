@@ -67,6 +67,8 @@ struct SidebarView: View {
 
             Spacer(minLength: 0)
 
+            WatcherStatusFooter(status: model.watcherStatus, paused: model.paused)
+
             HStack {
                 FooterLink(title: "Settings", systemImage: "gearshape") {
                     model.detailRoute = .settings
@@ -187,6 +189,57 @@ struct SidebarView: View {
         if let path = FolderPicker.choose() {
             model.addFolder(path: path)
         }
+    }
+}
+
+/// Compact watcher status shown above the sidebar footer: whether watching is
+/// active, when it last scanned, how many files it has processed, and the most
+/// recent problem if any.
+private struct WatcherStatusFooter: View {
+    let status: WatcherStatus
+    let paused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                Image(systemName: paused ? "pause.circle" : "dot.radiowaves.left.and.right")
+                    .font(.system(size: 10))
+                    .foregroundStyle(paused ? ForelTheme.secondaryText : ForelTheme.accent)
+                Text(primaryLine)
+                    .font(.system(size: 10))
+                    .foregroundStyle(ForelTheme.secondaryText)
+                    .lineLimit(1)
+            }
+
+            if let error = status.lastError {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.orange)
+                    Text(error)
+                        .font(.system(size: 10))
+                        .foregroundStyle(ForelTheme.secondaryText)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .help(error)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var primaryLine: String {
+        if paused { return "Watching paused" }
+        var parts: [String] = []
+        if let lastScanAt = status.lastScanAt {
+            parts.append("Scanned \(lastScanAt.formatted(.relative(presentation: .named)))")
+        } else {
+            parts.append("Watching")
+        }
+        if status.processedCount > 0 {
+            parts.append("\(status.processedCount) processed")
+        }
+        return parts.joined(separator: " · ")
     }
 }
 

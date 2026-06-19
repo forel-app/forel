@@ -76,11 +76,30 @@ public struct PreviewResult: Sendable {
     }
 }
 
+/// Outcome of evaluating a single file. `finalPath`/`removed` describe where the
+/// *originally-passed* file ended up, so the stateful watcher can store a
+/// post-action content fingerprint (rename → re-stat `finalPath`) or clean up
+/// its state (terminal move/trash/delete → `removed == true`). See plan D2.
+public struct EvaluationResult: Sendable {
+    public let matched: [String]
+    public let history: [HistoryEntry]
+    public let finalPath: String
+    public let removed: Bool
+
+    public init(matched: [String], history: [HistoryEntry], finalPath: String, removed: Bool) {
+        self.matched = matched
+        self.history = history
+        self.finalPath = finalPath
+        self.removed = removed
+    }
+}
+
 public enum RuleEngine {
     /// Evaluates all enabled rules against `path` and executes matching ones.
-    /// Returns the names of rules that matched and the history entries produced
-    /// by their actions (grouped under `batchId`).
-    public static func evaluateFile(path: String, depth: Int, rules: [Rule], batchId: String, root: String? = nil) -> (matched: [String], history: [HistoryEntry]) {
+    /// Returns the names of rules that matched, the history entries produced by
+    /// their actions (grouped under `batchId`), and where the originally-passed
+    /// file ended up (`finalPath` / `removed`).
+    public static func evaluateFile(path: String, depth: Int, rules: [Rule], batchId: String, root: String? = nil) -> EvaluationResult {
         struct PendingFile {
             let path: String
             let depth: Int
@@ -91,10 +110,17 @@ public enum RuleEngine {
         var history: [HistoryEntry] = []
         var pending = [PendingFile(path: path, depth: depth, startRuleIndex: 0)]
 
+        // The first item drained is always the originally-passed file; record
+        // its final location and whether a terminal action removed it.
+        var primaryFinalPath = path
+        var primaryRemoved = false
+        var isFirstPass = true
+
         while !pending.isEmpty {
             let target = pending.removeFirst()
             var currentPath = target.path
             var currentDepth = target.depth
+            var removedThisPass = false
 
             for ruleIndex in target.startRuleIndex..<rules.count {
                 let rule = rules[ruleIndex]
@@ -119,7 +145,11 @@ public enum RuleEngine {
                 // this location entirely, same as it stops the action chain
                 // within a single rule — no further rule in this pass should
                 // be evaluated against it.
-                if result.isTerminal { break }
+                if result.isTerminal {
+                    removedThisPass = true
+                    currentPath = result.finalPath
+                    break
+                }
 
                 // A non-terminal action (e.g. rename) can still change the
                 // file's path; follow it so the next rule in the chain sees
@@ -131,8 +161,14 @@ public enum RuleEngine {
                     }
                 }
             }
+
+            if isFirstPass {
+                primaryFinalPath = currentPath
+                primaryRemoved = removedThisPass
+                isFirstPass = false
+            }
         }
-        return (matched, history)
+        return EvaluationResult(matched: matched, history: history, finalPath: primaryFinalPath, removed: primaryRemoved)
     }
 
     public static func previewFile(path: String, depth: Int, rules: [Rule]) -> FilePreview? {

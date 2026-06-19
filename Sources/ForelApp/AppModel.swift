@@ -32,6 +32,7 @@ final class AppModel: ObservableObject {
     private var runNowMessageId: UUID?
     @Published private(set) var isPreviewing = false
     @Published var previewResult: PreviewResult?
+    @Published private(set) var watcherStatus = WatcherStatus()
 
     let db: Database
     private let coordinator: WatcherCoordinator
@@ -63,6 +64,10 @@ final class AppModel: ObservableObject {
 
         let storedShowDockIcon = try? db.getSetting("show_dock_icon")
         self.showDockIcon = storedShowDockIcon.map { $0 == "1" } ?? true
+
+        coordinator.onStatusChanged = { [weak self] status in
+            Task { @MainActor in self?.watcherStatus = status }
+        }
 
         reloadFolders()
         startWatchingEnabledFolders()
@@ -145,6 +150,9 @@ final class AppModel: ObservableObject {
         for folder in (try? db.listFolders()) ?? [] where folder.enabled {
             coordinator.add(folder.path)
         }
+        // Catch up on files that already exist or changed while the app was not
+        // running, so the watcher isn't limited to events seen live.
+        coordinator.startupScan()
     }
 
     func addFolder(path: String) {
@@ -163,7 +171,10 @@ final class AppModel: ObservableObject {
         let folder = WatchedFolder(path: normalizedPath)
         do {
             try db.insertFolder(folder)
-            if !paused { coordinator.add(normalizedPath) }
+            if !paused {
+                coordinator.add(normalizedPath)
+                coordinator.scanFolder(normalizedPath)
+            }
             reloadFolders()
         } catch {
             showError(error)
@@ -180,6 +191,7 @@ final class AppModel: ObservableObject {
         try? db.toggleFolder(folder.id, enabled: enabled)
         if enabled, !paused {
             coordinator.add(folder.path)
+            coordinator.scanFolder(folder.path)
         } else {
             coordinator.remove(folder.path)
         }
@@ -231,28 +243,20 @@ final class AppModel: ObservableObject {
             return
         }
         isRunningNow = true
-        Task {
-            defer { isRunningNow = false }
-            let allHistory = await Task.detached(priority: .userInitiated) {
-                let maxDepth = RuleEngine.maxRuleDepth(folderRules)
-                let entries = RuleEngine.walkEntries(root: folder.path, maxDepth: maxDepth)
-                let batchId = UUID().uuidString
-                var allHistory: [HistoryEntry] = []
-                for entry in entries {
-                    let (_, history) = RuleEngine.evaluateFile(path: entry.path, depth: entry.depth, rules: folderRules, batchId: batchId, root: folder.path)
-                    allHistory.append(contentsOf: history)
-                }
-                return allHistory
-            }.value
-            if !allHistory.isEmpty {
-                try? db.insertHistoryEntries(allHistory)
+        // Run Now goes through the watcher coordinator's forced path so it shares
+        // the same execution and file_state bookkeeping as the automatic watcher
+        // (and runs on the same serial worker, avoiding races).
+        coordinator.runNow(folderPath: folder.path) { [weak self] count in
+            Task { @MainActor in
+                guard let self else { return }
+                self.isRunningNow = false
+                self.reloadHistory()
+                self.showRunNowMessage(
+                    count == 0
+                        ? "Run complete — no matching files"
+                        : "Run complete — \(count) action\(count == 1 ? "" : "s") applied"
+                )
             }
-            reloadHistory()
-            showRunNowMessage(
-                allHistory.isEmpty
-                    ? "Run complete — no matching files"
-                    : "Run complete — \(allHistory.count) action\(allHistory.count == 1 ? "" : "s") applied"
-            )
         }
     }
 
@@ -344,6 +348,8 @@ final class AppModel: ObservableObject {
                 coordinator.add(folder.path)
             }
         }
+        // On resume, catch up on anything that changed while paused.
+        if !paused { coordinator.resumeScan() }
     }
 
     private func showNotice(title: String, message: String) {

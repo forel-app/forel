@@ -3,6 +3,16 @@
 All notable changes to Forel are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- The sidebar now shows watcher status: whether watching is active, when folders were last scanned, how many files were processed, and the latest issue if one occurred.
+
+### Changed
+- Watching now reacts to files being modified, not just created or moved, and waits for a file to finish changing before running rules.
+- When the app starts or watching resumes, watched folders are rescanned so files added or changed while it was closed or paused are caught up.
+- Rules no longer re-run on files already handled unless they actually change, and a file that keeps triggering itself is stopped instead of looping.
+
 ## [0.1.0-beta.5] - 2026-06-19
 
 ### Added

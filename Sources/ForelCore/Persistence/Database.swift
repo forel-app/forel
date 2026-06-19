@@ -6,7 +6,7 @@ import Foundation
 /// schema exactly so the existing alpha database at
 /// `~/Library/Application Support/com.forel.app/forel.db` keeps working.
 public final class Database: @unchecked Sendable {
-    public static let currentSchemaVersion: Int64 = 5
+    public static let currentSchemaVersion: Int64 = 6
 
     private let handle: OpaquePointer
     private let lock = NSLock()
@@ -139,6 +139,26 @@ public final class Database: @unchecked Sendable {
                 key   TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS file_state (
+                id                  TEXT PRIMARY KEY,
+                folder_id           TEXT NOT NULL REFERENCES watched_folders(id) ON DELETE CASCADE,
+                volume_id           INTEGER,
+                file_id             INTEGER,
+                path                TEXT NOT NULL UNIQUE,
+                content_fingerprint TEXT,
+                size_bytes          INTEGER,
+                modified_at         TEXT,
+                first_seen_at       TEXT NOT NULL,
+                last_seen_at        TEXT NOT NULL,
+                last_matched_at     TEXT,
+                last_processed_at   TEXT,
+                loop_count          INTEGER NOT NULL DEFAULT 0,
+                last_error          TEXT,
+                updated_at          TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_file_state_folder ON file_state(folder_id);
+            CREATE INDEX IF NOT EXISTS idx_file_state_identity ON file_state(volume_id, file_id);
             """
         )
         try runMigrations()
@@ -154,6 +174,7 @@ public final class Database: @unchecked Sendable {
         if version < 3 { try runMigration(3) { try self.migrateV3AddAppSettings() } }
         if version < 4 { try runMigration(4) { try self.migrateV4AddHistoryMessage() } }
         if version < 5 { try runMigration(5) { try self.migrateV5AddFolderPriority() } }
+        if version < 6 { try runMigration(6) { try self.migrateV6AddFileState() } }
     }
 
     private func runMigration(_ version: Int64, _ apply: () throws -> Void) throws {
@@ -215,6 +236,32 @@ public final class Database: @unchecked Sendable {
             update.bind(2, id)
             try update.runToCompletion()
         }
+    }
+
+    private func migrateV6AddFileState() throws {
+        try exec(
+            """
+            CREATE TABLE IF NOT EXISTS file_state (
+                id                  TEXT PRIMARY KEY,
+                folder_id           TEXT NOT NULL REFERENCES watched_folders(id) ON DELETE CASCADE,
+                volume_id           INTEGER,
+                file_id             INTEGER,
+                path                TEXT NOT NULL UNIQUE,
+                content_fingerprint TEXT,
+                size_bytes          INTEGER,
+                modified_at         TEXT,
+                first_seen_at       TEXT NOT NULL,
+                last_seen_at        TEXT NOT NULL,
+                last_matched_at     TEXT,
+                last_processed_at   TEXT,
+                loop_count          INTEGER NOT NULL DEFAULT 0,
+                last_error          TEXT,
+                updated_at          TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_file_state_folder ON file_state(folder_id);
+            CREATE INDEX IF NOT EXISTS idx_file_state_identity ON file_state(volume_id, file_id);
+            """
+        )
     }
 
     // MARK: - App settings
@@ -327,6 +374,157 @@ public final class Database: @unchecked Sendable {
 
     public func clearHistory() throws {
         try exec("DELETE FROM action_history")
+    }
+
+    // MARK: - File state
+
+    private static let fileStateColumns =
+        "id, folder_id, volume_id, file_id, path, content_fingerprint, size_bytes, modified_at, first_seen_at, last_seen_at, last_matched_at, last_processed_at, loop_count, last_error, updated_at"
+
+    private func rowToFileState(_ stmt: SQLiteStatement) -> FileState {
+        FileState(
+            id: stmt.columnText(0),
+            folderId: stmt.columnText(1),
+            volumeId: stmt.columnInt64OrNil(2),
+            fileId: stmt.columnInt64OrNil(3),
+            path: stmt.columnText(4),
+            contentFingerprint: stmt.columnTextOrNil(5),
+            sizeBytes: stmt.columnInt64OrNil(6),
+            modifiedAt: stmt.columnTextOrNil(7),
+            firstSeenAt: stmt.columnText(8),
+            lastSeenAt: stmt.columnText(9),
+            lastMatchedAt: stmt.columnTextOrNil(10),
+            lastProcessedAt: stmt.columnTextOrNil(11),
+            loopCount: stmt.columnInt64(12),
+            lastError: stmt.columnTextOrNil(13),
+            updatedAt: stmt.columnText(14)
+        )
+    }
+
+    /// Inserts or updates the row for `state.path`. `path` is the conflict key:
+    /// re-seeing a file at the same path updates its identity and "seen" markers
+    /// while preserving the original `first_seen_at`.
+    public func upsertFileState(_ state: FileState) throws {
+        let stmt = try statement(
+            """
+            INSERT INTO file_state
+            (id, folder_id, volume_id, file_id, path, content_fingerprint, size_bytes, modified_at,
+             first_seen_at, last_seen_at, last_matched_at, last_processed_at, loop_count, last_error, updated_at)
+            VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)
+            ON CONFLICT(path) DO UPDATE SET
+                folder_id           = excluded.folder_id,
+                volume_id           = excluded.volume_id,
+                file_id             = excluded.file_id,
+                content_fingerprint = excluded.content_fingerprint,
+                size_bytes          = excluded.size_bytes,
+                modified_at         = excluded.modified_at,
+                last_seen_at        = excluded.last_seen_at,
+                last_matched_at     = excluded.last_matched_at,
+                last_processed_at   = excluded.last_processed_at,
+                loop_count          = excluded.loop_count,
+                last_error          = excluded.last_error,
+                updated_at          = excluded.updated_at
+            """
+        )
+        stmt.bind(1, state.id)
+        stmt.bind(2, state.folderId)
+        stmt.bind(3, state.volumeId)
+        stmt.bind(4, state.fileId)
+        stmt.bind(5, state.path)
+        stmt.bind(6, state.contentFingerprint)
+        stmt.bind(7, state.sizeBytes)
+        stmt.bind(8, state.modifiedAt)
+        stmt.bind(9, state.firstSeenAt)
+        stmt.bind(10, state.lastSeenAt)
+        stmt.bind(11, state.lastMatchedAt)
+        stmt.bind(12, state.lastProcessedAt)
+        stmt.bind(13, state.loopCount)
+        stmt.bind(14, state.lastError)
+        stmt.bind(15, state.updatedAt)
+        try stmt.runToCompletion()
+    }
+
+    public func fileStateForPath(_ path: String) throws -> FileState? {
+        let stmt = try statement("SELECT \(Self.fileStateColumns) FROM file_state WHERE path=?1")
+        stmt.bind(1, path)
+        guard try stmt.step() else { return nil }
+        return rowToFileState(stmt)
+    }
+
+    /// Looks up a file by its persistable identity (device + inode), so a file
+    /// that was renamed/moved is recognised as the same one. Returns nil when
+    /// either component is nil (identity unavailable — caller falls back to path).
+    public func fileStateForIdentity(volumeId: Int64?, fileId: Int64?) throws -> FileState? {
+        guard let volumeId, let fileId else { return nil }
+        let stmt = try statement("SELECT \(Self.fileStateColumns) FROM file_state WHERE volume_id=?1 AND file_id=?2")
+        stmt.bind(1, volumeId)
+        stmt.bind(2, fileId)
+        guard try stmt.step() else { return nil }
+        return rowToFileState(stmt)
+    }
+
+    public func listFileStates(folderId: String) throws -> [FileState] {
+        let stmt = try statement("SELECT \(Self.fileStateColumns) FROM file_state WHERE folder_id=?1 ORDER BY path")
+        stmt.bind(1, folderId)
+        var states: [FileState] = []
+        while try stmt.step() { states.append(rowToFileState(stmt)) }
+        return states
+    }
+
+    /// Records a completed automatic/manual run: stores the post-action content
+    /// fingerprint, advances `last_processed_at` (and `last_matched_at` when at
+    /// least one rule matched), and clears any prior error. Operates on the row
+    /// for `path`; no-op if the file has no state row.
+    public func recordFileProcessingResult(
+        path: String,
+        contentFingerprint: String?,
+        sizeBytes: Int64?,
+        modifiedAt: String?,
+        matched: Bool,
+        at timestamp: String
+    ) throws {
+        let stmt = try statement(
+            """
+            UPDATE file_state SET
+                content_fingerprint = ?1,
+                size_bytes          = ?2,
+                modified_at         = ?3,
+                last_processed_at   = ?4,
+                last_matched_at     = CASE WHEN ?5 = 1 THEN ?4 ELSE last_matched_at END,
+                last_error          = NULL,
+                updated_at          = ?4
+            WHERE path = ?6
+            """
+        )
+        stmt.bind(1, contentFingerprint)
+        stmt.bind(2, sizeBytes)
+        stmt.bind(3, modifiedAt)
+        stmt.bind(4, timestamp)
+        stmt.bind(5, bool: matched)
+        stmt.bind(6, path)
+        try stmt.runToCompletion()
+    }
+
+    public func recordFileProcessingError(path: String, error: String, at timestamp: String) throws {
+        let stmt = try statement(
+            "UPDATE file_state SET last_error=?1, updated_at=?2 WHERE path=?3"
+        )
+        stmt.bind(1, error)
+        stmt.bind(2, timestamp)
+        stmt.bind(3, path)
+        try stmt.runToCompletion()
+    }
+
+    public func deleteFileState(path: String) throws {
+        let stmt = try statement("DELETE FROM file_state WHERE path=?1")
+        stmt.bind(1, path)
+        try stmt.runToCompletion()
+    }
+
+    public func deleteFileStates(folderId: String) throws {
+        let stmt = try statement("DELETE FROM file_state WHERE folder_id=?1")
+        stmt.bind(1, folderId)
+        try stmt.runToCompletion()
     }
 
     // MARK: - Watched folders

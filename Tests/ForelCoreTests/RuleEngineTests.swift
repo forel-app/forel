@@ -19,9 +19,9 @@ import Foundation
             makeRule(name: "empty"),
         ]
 
-        let (matched, history) = RuleEngine.evaluateFile(path: file, depth: 0, rules: rules, batchId: "batch")
-        #expect(matched == ["all matched", "any matched", "empty"])
-        #expect(history.isEmpty)
+        let result = RuleEngine.evaluateFile(path: file, depth: 0, rules: rules, batchId: "batch")
+        #expect(result.matched == ["all matched", "any matched", "empty"])
+        #expect(result.history.isEmpty)
     }
 
     @Test func previewFileHidesAlreadyAppliedActions() throws {
@@ -37,9 +37,9 @@ import Foundation
         #expect(before?.rules[0].actions.count == 2)
         #expect(before?.rules[0].actions.map(\.status) == [.wouldRun, .wouldRun])
 
-        let (_, history) = RuleEngine.evaluateFile(path: file, depth: 0, rules: [rule], batchId: "batch")
-        #expect(history.count == 2)
-        #expect(history.allSatisfy { $0.reversible })
+        let evaluation = RuleEngine.evaluateFile(path: file, depth: 0, rules: [rule], batchId: "batch")
+        #expect(evaluation.history.count == 2)
+        #expect(evaluation.history.allSatisfy { $0.reversible })
         let after = RuleEngine.previewFile(path: file, depth: 0, rules: [rule])
         #expect(after?.rules[0].actions.map(\.status) == [.wouldSkip, .wouldSkip])
     }
@@ -349,5 +349,63 @@ import Foundation
         #expect(RuleEngine.pathDepth(root: "/Users/x/Inbox", path: "/Users/x/Inbox/file.txt") == 0)
         #expect(RuleEngine.pathDepth(root: "/Users/x/Inbox", path: "/Users/x/Inbox/Sub/file.txt") == 1)
         #expect(RuleEngine.pathDepth(root: "/Users/x/Inbox", path: "/Users/x/Other/file.txt") == nil)
+    }
+
+    // MARK: - Evaluation outcome (finalPath / removed), plan D2
+
+    @Test func evaluateFileReportsFinalPathAfterRenameWithoutRemoval() throws {
+        let dir = TempDir()
+        let file = dir.file("draft.pdf", contents: "content")
+        let rule = makeRule(
+            name: "Rename",
+            actions: [makeAction(.rename, .object(["pattern": .string("final.pdf")]))]
+        )
+
+        let result = RuleEngine.evaluateFile(path: file, depth: 0, rules: [rule], batchId: "batch", root: dir.path)
+
+        let renamed = (dir.path as NSString).appendingPathComponent("final.pdf")
+        #expect(result.finalPath == renamed)
+        #expect(result.removed == false)
+    }
+
+    @Test func evaluateFileReportsRemovedAfterTerminalMove() throws {
+        let dir = TempDir()
+        let file = dir.file("doc.pdf", contents: "content")
+        let archivedDir = dir.dir("Archived")
+        let rule = makeRule(
+            name: "Archive",
+            actions: [makeAction(.moveToFolder, .object(["destination": .string(archivedDir)]))]
+        )
+
+        let result = RuleEngine.evaluateFile(path: file, depth: 0, rules: [rule], batchId: "batch", root: dir.path)
+
+        #expect(result.removed == true)
+        #expect(result.finalPath == (archivedDir as NSString).appendingPathComponent("doc.pdf"))
+    }
+
+    @Test func evaluateFileReportsRemovedAfterDelete() throws {
+        let dir = TempDir()
+        let file = dir.file("junk.tmp", contents: "x")
+        let rule = makeRule(name: "Delete", actions: [makeAction(.delete, .object([:]))])
+
+        let result = RuleEngine.evaluateFile(path: file, depth: 0, rules: [rule], batchId: "batch", root: dir.path)
+
+        #expect(result.removed == true)
+    }
+
+    @Test func evaluateFileFinalPathUnchangedWhenNoRuleRuns() throws {
+        let dir = TempDir()
+        let file = dir.file("keep.txt", contents: "x")
+        let rule = makeRule(
+            name: "Never matches",
+            conditions: [makeCondition(.extension_, .is, "pdf")],
+            actions: [makeAction(.addTag, .object(["tags": .stringArray(["x"])]))]
+        )
+
+        let result = RuleEngine.evaluateFile(path: file, depth: 0, rules: [rule], batchId: "batch", root: dir.path)
+
+        #expect(result.matched.isEmpty)
+        #expect(result.finalPath == file)
+        #expect(result.removed == false)
     }
 }

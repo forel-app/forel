@@ -158,6 +158,77 @@ public enum HistoryStatus: String, Codable, Equatable, Sendable {
     case needsConfirmation = "needs_confirmation"
 }
 
+/// Persistent per-file watcher state. Lets the stateful watcher decide whether a
+/// file is new, unchanged, or changed since it was last processed, recover state
+/// across renames/moves, and detect runaway reprocessing loops.
+///
+/// Identity and content fingerprint are kept strictly separate (see plan D1):
+/// `volumeId` + `fileId` (POSIX device + inode) identify *which* file this row is
+/// about and survive renames; `contentFingerprint` (derived from `sizeBytes` +
+/// `modifiedAt` only — never the path) decides whether the file *changed*.
+public struct FileState: Codable, Equatable, Sendable {
+    public var id: String
+    public var folderId: String
+    /// POSIX device id (`st_dev`). Nil when unavailable; falls back to `path`.
+    public var volumeId: Int64?
+    /// POSIX inode (`st_ino`), the persistable file identity. Nil when unavailable.
+    public var fileId: Int64?
+    public var path: String
+    /// Content fingerprint of the last processed state. nil until first processed.
+    public var contentFingerprint: String?
+    public var sizeBytes: Int64?
+    public var modifiedAt: String?
+    public var firstSeenAt: String
+    public var lastSeenAt: String
+    public var lastMatchedAt: String?
+    public var lastProcessedAt: String?
+    public var loopCount: Int64
+    public var lastError: String?
+    public var updatedAt: String
+
+    public init(
+        id: String = UUID().uuidString,
+        folderId: String,
+        volumeId: Int64? = nil,
+        fileId: Int64? = nil,
+        path: String,
+        contentFingerprint: String? = nil,
+        sizeBytes: Int64? = nil,
+        modifiedAt: String? = nil,
+        firstSeenAt: String = ISO8601DateFormatter().string(from: Date()),
+        lastSeenAt: String = ISO8601DateFormatter().string(from: Date()),
+        lastMatchedAt: String? = nil,
+        lastProcessedAt: String? = nil,
+        loopCount: Int64 = 0,
+        lastError: String? = nil,
+        updatedAt: String = ISO8601DateFormatter().string(from: Date())
+    ) {
+        self.id = id
+        self.folderId = folderId
+        self.volumeId = volumeId
+        self.fileId = fileId
+        self.path = path
+        self.contentFingerprint = contentFingerprint
+        self.sizeBytes = sizeBytes
+        self.modifiedAt = modifiedAt
+        self.firstSeenAt = firstSeenAt
+        self.lastSeenAt = lastSeenAt
+        self.lastMatchedAt = lastMatchedAt
+        self.lastProcessedAt = lastProcessedAt
+        self.loopCount = loopCount
+        self.lastError = lastError
+        self.updatedAt = updatedAt
+    }
+
+    /// Deterministic content fingerprint from size + modification date only. The
+    /// path is intentionally excluded so a pure rename does not look "changed".
+    /// Returns nil when either input is missing (e.g. the file vanished).
+    public static func contentFingerprint(sizeBytes: Int64?, modifiedAt: String?) -> String? {
+        guard let sizeBytes, let modifiedAt else { return nil }
+        return "\(sizeBytes):\(modifiedAt)"
+    }
+}
+
 /// A single executed action, recorded so it can be reviewed (log) and reversed
 /// (undo). Entries from one rule run share a `batchId`.
 public struct HistoryEntry: Codable, Equatable, Sendable {

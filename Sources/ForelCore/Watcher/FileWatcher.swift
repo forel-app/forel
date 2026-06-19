@@ -97,10 +97,14 @@ public final class FileWatcher: @unchecked Sendable {
 
         for (index, path) in paths.enumerated() {
             let flag = flags[index]
-            let isCreateOrRename = flag & UInt32(kFSEventStreamEventFlagItemCreated) != 0
+            // Stateful watcher reacts to creation, rename/move and content
+            // changes; the new-or-changed gate downstream decides what actually
+            // runs. Removals are ignored (stale state is cleaned elsewhere).
+            let isRelevant = flag & UInt32(kFSEventStreamEventFlagItemCreated) != 0
                 || flag & UInt32(kFSEventStreamEventFlagItemRenamed) != 0
-            guard isCreateOrRename else { continue }
-            if (path as NSString).lastPathComponent == ".DS_Store" { continue }
+                || flag & UInt32(kFSEventStreamEventFlagItemModified) != 0
+            guard isRelevant else { continue }
+            if WatcherDecision.shouldIgnore(path: path) { continue }
             handler(path)
         }
     }
