@@ -3,6 +3,11 @@
 All notable changes to Forel are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- Added a Run Shortcut rule action that lists macOS Shortcuts and lets each action choose matched-file or no-input mode.
+
 ## [0.1.0-beta.4] - 2026-06-18
 
 ### Added

@@ -160,6 +160,8 @@ public enum ActionParam {
     public static let tags = "tags"
     public static let color = "color"
     public static let script = "script"
+    public static let shortcutName = "shortcut_name"
+    public static let shortcutInputMode = "shortcut_input_mode"
 }
 
 /// The abstract shape of an action parameter; the UI maps it to a concrete editor.
@@ -169,6 +171,7 @@ public enum ActionParamKind: Sendable, Equatable {
     case tags
     case colorLabel
     case script
+    case shortcut
 }
 
 public struct ActionParamSpec: Sendable, Equatable {
@@ -195,6 +198,7 @@ public extension ActionKind {
         case .removeTag: return "Remove tag"
         case .setColorLabel: return "Set color label"
         case .runScript: return "Run script"
+        case .runShortcut: return "Run shortcut"
         }
     }
 
@@ -208,6 +212,7 @@ public extension ActionKind {
         case .addTag, .removeTag: return "tag"
         case .setColorLabel: return "paintpalette"
         case .runScript: return "terminal"
+        case .runShortcut: return "square.stack.3d.up"
         }
     }
 
@@ -225,6 +230,8 @@ public extension ActionKind {
             return [ActionParamSpec(key: ActionParam.color, kind: .colorLabel)]
         case .runScript:
             return [ActionParamSpec(key: ActionParam.script, kind: .script)]
+        case .runShortcut:
+            return [ActionParamSpec(key: ActionParam.shortcutName, kind: .shortcut)]
         case .moveToTrash, .delete:
             return []
         }
@@ -262,7 +269,7 @@ public enum RuleSchema {
 
     public static let actionKinds: [ActionKind] = [
         .moveToFolder, .copyToFolder, .rename, .moveToTrash, .delete,
-        .addTag, .removeTag, .setColorLabel, .runScript,
+        .addTag, .removeTag, .setColorLabel, .runScript, .runShortcut,
     ]
 
     /// Resolves the value editor for a condition, combining the kind's base

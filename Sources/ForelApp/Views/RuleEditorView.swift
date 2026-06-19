@@ -562,6 +562,7 @@ private struct KindValuePicker: View {
 private struct ActionRow: View {
     @Binding var action: Action
     let onDelete: () -> Void
+    @State private var showingOptions = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -574,8 +575,22 @@ private struct ActionRow: View {
             .frame(width: 190)
 
             actionParams
-                .frame(width: 420, alignment: .leading)
+                .frame(width: 380, alignment: .leading)
                 .frame(minHeight: 32)
+
+            Button {
+                showingOptions.toggle()
+            } label: {
+                Image(systemName: "ellipsis")
+            }
+            .buttonStyle(IconButtonStyle())
+            .help("Action options")
+            .frame(width: 28)
+            .popover(isPresented: $showingOptions, arrowEdge: .bottom) {
+                ActionOptionsView(action: $action)
+                    .padding(14)
+                    .frame(width: 280)
+            }
 
             Button(role: .destructive, action: onDelete) {
                 Image(systemName: "minus")
@@ -600,6 +615,8 @@ private struct ActionRow: View {
             ColorLabelPicker(selection: paramBinding(ActionParam.color), allowNone: true)
         case .runScript:
             GlassField(placeholder: "Bash script (file path in $FOREL_FILE)", text: paramBinding(ActionParam.script))
+        case .runShortcut:
+            ShortcutPicker(selection: paramBinding(ActionParam.shortcutName))
         case .moveToTrash, .delete:
             Text("No parameters")
                 .font(.system(size: 11))
@@ -652,6 +669,121 @@ private struct ActionRow: View {
                 action.params = .object(dict)
             }
         )
+    }
+}
+
+private struct ActionOptionsView: View {
+    @Binding var action: Action
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Options")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(ForelTheme.primaryText)
+
+            switch action.kind {
+            case .runShortcut:
+                shortcutOptions
+            default:
+                Text("No options for this action.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(ForelTheme.secondaryText)
+            }
+        }
+    }
+
+    private var shortcutOptions: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Input")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(ForelTheme.secondaryText)
+
+            Picker("", selection: paramBinding(ActionParam.shortcutInputMode, defaultValue: ShortcutInputMode.matchedFile.rawValue)) {
+                ForEach(ShortcutInputMode.allCases, id: \.rawValue) { mode in
+                    Text(mode.label).tag(mode.rawValue)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func paramBinding(_ key: String, defaultValue: String = "") -> Binding<String> {
+        Binding(
+            get: { action.params[key]?.stringValue ?? defaultValue },
+            set: { newValue in
+                var dict: [String: JSONValue] = [:]
+                if case .object(let existing) = action.params { dict = existing }
+                dict[key] = .string(newValue)
+                action.params = .object(dict)
+            }
+        )
+    }
+}
+
+private struct ShortcutPicker: View {
+    @Binding var selection: String
+    @State private var shortcuts: [String] = []
+    @State private var isLoading = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if shortcuts.isEmpty {
+                GlassField(placeholder: isLoading ? "Loading shortcuts..." : "Shortcut name", text: $selection)
+            } else {
+                Picker("", selection: shortcutBinding) {
+                    ForEach(shortcutOptions, id: \.self) { shortcut in
+                        Text(shortcut).tag(shortcut)
+                    }
+                }
+                .labelsHidden()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Button(action: loadShortcuts) {
+                Image(systemName: "arrow.clockwise")
+            }
+            .buttonStyle(IconButtonStyle())
+            .help("Refresh shortcuts")
+        }
+        .task {
+            if shortcuts.isEmpty {
+                loadShortcuts()
+            }
+        }
+    }
+
+    private var shortcutOptions: [String] {
+        let trimmed = selection.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !shortcuts.contains(trimmed) else { return shortcuts }
+        return [trimmed] + shortcuts
+    }
+
+    private var shortcutBinding: Binding<String> {
+        Binding(
+            get: {
+                let trimmed = selection.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty { return trimmed }
+                return shortcuts.first ?? ""
+            },
+            set: { selection = $0 }
+        )
+    }
+
+    private func loadShortcuts() {
+        isLoading = true
+        DispatchQueue.global(qos: .utility).async {
+            let names = ShortcutCatalog.availableShortcutNames()
+            DispatchQueue.main.async {
+                shortcuts = names
+                if selection.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   let first = names.first {
+                    selection = first
+                }
+                isLoading = false
+            }
+        }
     }
 }
 
