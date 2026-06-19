@@ -131,6 +131,8 @@ public enum ActionExecutor {
             return try setColor(action, path: path)
         case .runScript:
             return try runScript(action, path: path)
+        case .runShortcut:
+            return try runShortcut(action, path: path)
         }
     }
 
@@ -201,6 +203,12 @@ public enum ActionExecutor {
         guard process.terminationStatus == 0 else {
             throw ActionError("script exited with status \(process.terminationStatus)")
         }
+        return Applied(newPath: path, undo: .none)
+    }
+
+    private static func runShortcut(_ action: Action, path: String) throws -> Applied {
+        let name = try stringParam(action, ActionParam.shortcutName, "RunShortcut")
+        try ShortcutRunner.run(name: name, inputPath: path)
         return Applied(newPath: path, undo: .none)
     }
 
@@ -358,6 +366,18 @@ public enum ActionExecutor {
                 copiedPath: nil,
                 isTerminal: false
             )
+        case .runShortcut:
+            let name = action.params[ActionParam.shortcutName]?.stringValue ?? ""
+            return ActionPlan(
+                kind: action.kind,
+                description: name.isEmpty ? "Run shortcut" : "Run shortcut: \(name)",
+                sourcePath: path,
+                targetPath: nil,
+                status: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .wouldSkip : .wouldRun,
+                finalPath: path,
+                copiedPath: nil,
+                isTerminal: false
+            )
         }
     }
 
@@ -376,7 +396,7 @@ public enum ActionExecutor {
             let pattern = action.params[ActionParam.pattern]?.stringValue ?? ""
             guard let newName = try? applyRenamePattern(pattern, path: path) else { return true }
             return (path as NSString).lastPathComponent != newName
-        case .moveToFolder, .copyToFolder, .moveToTrash, .delete, .runScript:
+        case .moveToFolder, .copyToFolder, .moveToTrash, .delete, .runScript, .runShortcut:
             return true
         }
     }
@@ -470,5 +490,78 @@ public enum ActionExecutor {
             throw ActionError("HOME not set")
         }
         return (home as NSString).appendingPathComponent(".Trash")
+    }
+}
+
+public enum ShortcutCatalog {
+    public static func availableShortcutNames() -> [String] {
+        listOutput().map(parseShortcutList(_:)) ?? []
+    }
+
+    static func parseShortcutList(_ output: String) -> [String] {
+        var seen = Set<String>()
+        return output
+            .split(whereSeparator: \.isNewline)
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .filter { seen.insert($0).inserted }
+    }
+
+    private static func listOutput() -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: ShortcutRunner.executablePath)
+        process.arguments = ["list"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+        } catch {
+            return nil
+        }
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+}
+
+enum ShortcutRunner {
+    static let executablePath = "/usr/bin/shortcuts"
+    private static let defaultTimeout: TimeInterval = 60
+
+    static func run(name: String, inputPath: String, timeout: TimeInterval = defaultTimeout) throws {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            throw ActionError("RunShortcut requires '\(ActionParam.shortcutName)' param")
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executablePath)
+        process.arguments = ["run", trimmedName, "--input-path", inputPath]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+
+        try process.run()
+
+        let group = DispatchGroup()
+        group.enter()
+        DispatchQueue.global(qos: .utility).async {
+            process.waitUntilExit()
+            group.leave()
+        }
+
+        if group.wait(timeout: DispatchTime.now() + timeout) == .timedOut {
+            process.terminate()
+            _ = group.wait(timeout: DispatchTime.now() + 2)
+            throw ActionError("shortcut timed out")
+        }
+
+        guard process.terminationStatus == 0 else {
+            throw ActionError("shortcut exited with status \(process.terminationStatus)")
+        }
     }
 }

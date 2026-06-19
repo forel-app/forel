@@ -85,6 +85,7 @@ public enum ActionKind: String, Codable, Equatable, Sendable {
     case removeTag = "remove_tag"
     case setColorLabel = "set_color_label"
     case runScript = "run_script"
+    case runShortcut = "run_shortcut"
 
     public init(dbValue: String) {
         self = ActionKind(rawValue: dbValue) ?? .moveToFolder

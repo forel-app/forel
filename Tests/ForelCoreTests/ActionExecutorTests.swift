@@ -141,4 +141,26 @@ import Foundation
             try ActionExecutor.revert(applied.undo)
         }
     }
+
+    @Test func runShortcutPreviewUsesShortcutNameAndSkipsWhenMissing() throws {
+        let dir = TempDir()
+        let file = dir.file("shortcut-input.txt", contents: "x")
+
+        let named = makeAction(.runShortcut, .object(["shortcut_name": .string("Archive Invoice")]))
+        let namedPlan = try ActionExecutor.plan(named, path: file)
+        #expect(namedPlan.description == "Run shortcut: Archive Invoice")
+        #expect(namedPlan.status == .wouldRun)
+        #expect(namedPlan.finalPath == file)
+        #expect(!namedPlan.isTerminal)
+
+        let missing = makeAction(.runShortcut, .object([:]))
+        let missingPlan = try ActionExecutor.plan(missing, path: file)
+        #expect(missingPlan.description == "Run shortcut")
+        #expect(missingPlan.status == .wouldSkip)
+    }
+
+    @Test func shortcutListParsingTrimsEmptyAndDuplicateNames() {
+        let output = "\nArchive Invoice\n  Resize Images  \nArchive Invoice\n\n"
+        #expect(ShortcutCatalog.parseShortcutList(output) == ["Archive Invoice", "Resize Images"])
+    }
 }

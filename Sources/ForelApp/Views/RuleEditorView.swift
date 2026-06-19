@@ -600,6 +600,8 @@ private struct ActionRow: View {
             ColorLabelPicker(selection: paramBinding(ActionParam.color), allowNone: true)
         case .runScript:
             GlassField(placeholder: "Bash script (file path in $FOREL_FILE)", text: paramBinding(ActionParam.script))
+        case .runShortcut:
+            ShortcutPicker(selection: paramBinding(ActionParam.shortcutName))
         case .moveToTrash, .delete:
             Text("No parameters")
                 .font(.system(size: 11))
@@ -652,6 +654,71 @@ private struct ActionRow: View {
                 action.params = .object(dict)
             }
         )
+    }
+}
+
+private struct ShortcutPicker: View {
+    @Binding var selection: String
+    @State private var shortcuts: [String] = []
+    @State private var isLoading = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if shortcuts.isEmpty {
+                GlassField(placeholder: isLoading ? "Loading shortcuts..." : "Shortcut name", text: $selection)
+            } else {
+                Picker("", selection: shortcutBinding) {
+                    ForEach(shortcutOptions, id: \.self) { shortcut in
+                        Text(shortcut).tag(shortcut)
+                    }
+                }
+                .labelsHidden()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Button(action: loadShortcuts) {
+                Image(systemName: "arrow.clockwise")
+            }
+            .buttonStyle(IconButtonStyle())
+            .help("Refresh shortcuts")
+        }
+        .task {
+            if shortcuts.isEmpty {
+                loadShortcuts()
+            }
+        }
+    }
+
+    private var shortcutOptions: [String] {
+        let trimmed = selection.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !shortcuts.contains(trimmed) else { return shortcuts }
+        return [trimmed] + shortcuts
+    }
+
+    private var shortcutBinding: Binding<String> {
+        Binding(
+            get: {
+                let trimmed = selection.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty { return trimmed }
+                return shortcuts.first ?? ""
+            },
+            set: { selection = $0 }
+        )
+    }
+
+    private func loadShortcuts() {
+        isLoading = true
+        DispatchQueue.global(qos: .utility).async {
+            let names = ShortcutCatalog.availableShortcutNames()
+            DispatchQueue.main.async {
+                shortcuts = names
+                if selection.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   let first = names.first {
+                    selection = first
+                }
+                isLoading = false
+            }
+        }
     }
 }
 
