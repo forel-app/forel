@@ -165,10 +165,10 @@ forel/
 - [x] Shortcuts actions
 - [x] Drag & drop to reorder rules
 - [x] Rules based metadata files
+- [x] Activity logs
 - [ ] Sync actions
 - [ ] Upload actions
 - [ ] Native notifications on rule actions
-- [ ] Activity logs
 - [ ] Automatic cleaning database
 - [ ] AI features
 
