@@ -167,8 +167,11 @@ public enum ActionExecutor {
             return try copyToFolder(action, path: path)
         case .rename:
             return try renameFile(action, path: path)
-        case .moveToTrash, .delete:
+        case .moveToTrash:
             return try moveIntoDir(path: path, destDir: try trashDir())
+        case .delete:
+            try FileManager.default.removeItem(atPath: path)
+            return Applied(newPath: path, undo: .none)
         case .addTag:
             return try applyTags(action, path: path, add: true)
         case .removeTag:
@@ -451,14 +454,13 @@ public enum ActionExecutor {
                 isTerminal: true
             )
         case .delete:
-            let target = (try trashDir() as NSString).appendingPathComponent(fileName)
             return ActionPlan(
                 kind: action.kind,
-                description: "Delete (move to Trash)",
+                description: "Delete permanently",
                 sourcePath: path,
-                targetPath: target,
-                status: conflictStatus(target),
-                finalPath: target,
+                targetPath: nil,
+                status: .wouldRun,
+                finalPath: path,
                 copiedPath: nil,
                 isTerminal: true
             )

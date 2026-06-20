@@ -24,6 +24,7 @@ All notable changes to Forel are documented here. Format loosely follows
 - Fixed history retention cleanup incorrectly comparing dates across timezones — dates are now always stored and compared in UTC.
 - Fixed the watcher re-evaluating every file once after migrating to the new path-state schema, instead of trusting a matching fingerprint.
 - Fixed Run Script actions hanging forever when the script doesn't exit — they now time out after 60 seconds.
+- Delete now permanently removes the file instead of moving it to the Trash (undo is no longer available for Delete).
 - Fixed Dry Run showing an empty action area instead of explaining when a matched rule has no actions.
 - Fixed Activity becoming unresponsive when opening very large history logs.
 - Fixed renamed or moved files being immediately reprocessed by the watcher and receiving repeated rename suffixes.
