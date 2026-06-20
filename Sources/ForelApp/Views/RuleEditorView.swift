@@ -373,6 +373,38 @@ private struct ConditionOperatorMenu: View {
     }
 }
 
+private struct ActionKindMenu: View {
+    @Binding var selection: ActionKind
+
+    var body: some View {
+        RuleSelectMenu(title: selection.label) {
+            ForEach(RuleSchema.actionKinds, id: \.self) { kind in
+                Button(kind.label) { selection = kind }
+            }
+        }
+    }
+}
+
+private struct StringSelectMenu: View {
+    @Binding var selection: String
+    let options: [String]
+    let label: (String) -> String
+
+    init(selection: Binding<String>, options: [String], label: @escaping (String) -> String = { $0 }) {
+        _selection = selection
+        self.options = options
+        self.label = label
+    }
+
+    var body: some View {
+        RuleSelectMenu(title: label(selection)) {
+            ForEach(options, id: \.self) { option in
+                Button(label(option)) { selection = option }
+            }
+        }
+    }
+}
+
 private struct RuleSelectMenu<Content: View>: View {
     let title: String
     @ViewBuilder var content: Content
@@ -462,12 +494,7 @@ private struct RelativeDateValueEditor: View {
         HStack(spacing: 8) {
             GlassField(placeholder: "7", text: numberBinding)
                 .frame(width: 72)
-            Picker("", selection: unitBinding) {
-                ForEach(["days", "weeks", "months", "years"], id: \.self) { unit in
-                    Text(unit).tag(unit)
-                }
-            }
-            .labelsHidden()
+            StringSelectMenu(selection: unitBinding, options: ["days", "weeks", "months", "years"])
             .frame(width: 120)
             Spacer(minLength: 0)
         }
@@ -502,12 +529,7 @@ private struct SizeValueEditor: View {
         HStack(spacing: 8) {
             GlassField(placeholder: "0", text: numberBinding)
                 .frame(width: 90)
-            Picker("", selection: unitBinding) {
-                ForEach(["bytes", "KB", "MB", "GB"], id: \.self) { unit in
-                    Text(unit).tag(unit)
-                }
-            }
-            .labelsHidden()
+            StringSelectMenu(selection: unitBinding, options: ["bytes", "KB", "MB", "GB"])
             .frame(width: 110)
             Spacer(minLength: 0)
         }
@@ -585,12 +607,11 @@ private struct KindValuePicker: View {
     @Binding var value: String
 
     var body: some View {
-        Picker("", selection: valueBinding) {
-            ForEach(FileKindCatalog.all, id: \.value) { value, label in
-                Text(label).tag(value)
-            }
-        }
-        .labelsHidden()
+        StringSelectMenu(
+            selection: valueBinding,
+            options: FileKindCatalog.all.map(\.value),
+            label: { value in FileKindCatalog.all.first { $0.value == value }?.label ?? value }
+        )
         .frame(width: 180, alignment: .leading)
     }
 
@@ -611,12 +632,7 @@ private struct ActionRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            Picker("", selection: kindBinding) {
-                ForEach(RuleSchema.actionKinds, id: \.self) { kind in
-                    Text(kind.label).tag(kind)
-                }
-            }
-            .labelsHidden()
+            ActionKindMenu(selection: kindBinding)
             .frame(width: 190)
 
             actionParams
@@ -749,13 +765,11 @@ private struct ActionOptionsView: View {
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(ForelTheme.secondaryText)
 
-            Picker("", selection: paramBinding(ActionParam.onConflict, defaultValue: MoveConflictResolution.rename.rawValue)) {
-                ForEach(MoveConflictResolution.allCases, id: \.rawValue) { resolution in
-                    Text(resolution.label).tag(resolution.rawValue)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
+            StringSelectMenu(
+                selection: paramBinding(ActionParam.onConflict, defaultValue: MoveConflictResolution.rename.rawValue),
+                options: MoveConflictResolution.allCases.map(\.rawValue),
+                label: { value in MoveConflictResolution(rawValue: value)?.label ?? value }
+            )
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -766,13 +780,11 @@ private struct ActionOptionsView: View {
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(ForelTheme.secondaryText)
 
-            Picker("", selection: paramBinding(ActionParam.shortcutInputMode, defaultValue: ShortcutInputMode.matchedFile.rawValue)) {
-                ForEach(ShortcutInputMode.allCases, id: \.rawValue) { mode in
-                    Text(mode.label).tag(mode.rawValue)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
+            StringSelectMenu(
+                selection: paramBinding(ActionParam.shortcutInputMode, defaultValue: ShortcutInputMode.matchedFile.rawValue),
+                options: ShortcutInputMode.allCases.map(\.rawValue),
+                label: { value in ShortcutInputMode(rawValue: value)?.label ?? value }
+            )
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -800,12 +812,7 @@ private struct ShortcutPicker: View {
             if shortcuts.isEmpty {
                 GlassField(placeholder: isLoading ? "Loading shortcuts..." : "Shortcut name", text: $selection)
             } else {
-                Picker("", selection: shortcutBinding) {
-                    ForEach(shortcutOptions, id: \.self) { shortcut in
-                        Text(shortcut).tag(shortcut)
-                    }
-                }
-                .labelsHidden()
+                StringSelectMenu(selection: shortcutBinding, options: shortcutOptions)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
