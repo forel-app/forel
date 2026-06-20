@@ -106,7 +106,7 @@ struct SettingsView: View {
     }
 
     private var header: some View {
-        ViewHeader(title: "Settings", subtitle: "Forel preferences") {
+        ViewHeader(title: "Settings", subtitle: "Forel preferences", systemImage: "gearshape") {
             Button {
                 model.detailRoute = .rules
             } label: {

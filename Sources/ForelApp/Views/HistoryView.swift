@@ -13,7 +13,7 @@ struct HistoryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            ViewHeader(title: "Activity", subtitle: "\(model.historyTotalCount) recorded action\(model.historyTotalCount == 1 ? "" : "s")") {
+            ViewHeader(title: "Activity", subtitle: "\(model.historyTotalCount) recorded action\(model.historyTotalCount == 1 ? "" : "s")", systemImage: "clock.arrow.circlepath") {
                 Button {
                     model.detailRoute = .rules
                 } label: {
