@@ -16,6 +16,10 @@ final class AppModel: ObservableObject {
     @Published var selectedFolderId: String?
     @Published var rules: [Rule] = []
     @Published var history: [HistoryEntry] = []
+    @Published var historyTotalCount: Int = 0
+    @Published var historyFolderFilterId: String?
+    @Published private(set) var hasMoreHistory = false
+    @Published private(set) var isLoadingHistory = false
     @Published var paused: Bool = false
     @Published var alertTitle: String = "Error"
     @Published var errorMessage: String?
@@ -35,6 +39,7 @@ final class AppModel: ObservableObject {
 
     let db: Database
     private let coordinator: WatcherCoordinator
+    private let historyPageSize = 50
 
     init() throws {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -128,6 +133,10 @@ final class AppModel: ObservableObject {
         if selectedFolderId == nil {
             selectedFolderId = folders.first?.id
         }
+        if let historyFolderFilterId, !folders.contains(where: { $0.id == historyFolderFilterId }) {
+            self.historyFolderFilterId = nil
+            reloadHistory()
+        }
         reloadRules()
     }
 
@@ -137,7 +146,41 @@ final class AppModel: ObservableObject {
     }
 
     func reloadHistory() {
-        history = (try? db.listHistory()) ?? []
+        loadHistoryPage(reset: true)
+    }
+
+    func loadMoreHistoryIfNeeded(currentEntry entry: HistoryEntry? = nil) {
+        guard hasMoreHistory, !isLoadingHistory else { return }
+        if let entry, history.last?.id != entry.id { return }
+        loadHistoryPage(reset: false)
+    }
+
+    func setHistoryFolderFilter(_ folderId: String?) {
+        guard historyFolderFilterId != folderId else { return }
+        historyFolderFilterId = folderId
+        reloadHistory()
+    }
+
+    private func loadHistoryPage(reset: Bool) {
+        guard !isLoadingHistory else { return }
+        isLoadingHistory = true
+        defer { isLoadingHistory = false }
+
+        let directoryPath = historyFilterDirectoryPath
+        if reset {
+            history = []
+            historyTotalCount = (try? db.countHistory(directoryPath: directoryPath)) ?? 0
+        }
+
+        let offset = reset ? 0 : history.count
+        let page = (try? db.listHistory(limit: historyPageSize, offset: offset, directoryPath: directoryPath)) ?? []
+        history = reset ? page : history + page
+        hasMoreHistory = history.count < historyTotalCount
+    }
+
+    private var historyFilterDirectoryPath: String? {
+        guard let historyFolderFilterId else { return nil }
+        return folders.first(where: { $0.id == historyFolderFilterId })?.path
     }
 
     private func startWatchingEnabledFolders() {

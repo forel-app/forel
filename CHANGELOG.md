@@ -6,6 +6,7 @@ All notable changes to Forel are documented here. Format loosely follows
 ## [Unreleased]
 
 ### Added
+- Added a directory filter and paginated loading to Activity so large histories open faster.
 - Added an option to Move to Folder and Copy to Folder rules for handling a file that already exists at the destination: rename the new file (default), replace the existing file (sent to the Trash, not deleted), or skip the file to avoid creating a duplicate.
 
 ### Changed
@@ -13,6 +14,7 @@ All notable changes to Forel are documented here. Format loosely follows
 - Undo now refuses to act if the file changed since the original action, or if an active rule would immediately reprocess the restored file, instead of silently restoring the wrong file or letting the watcher redo what was just undone.
 - Copy to Folder is no longer undoable — a copy is an independent file once created, not something to roll back.
 - The action options button in the rule editor is now hidden for actions that have no options instead of showing an empty popover.
+- Database upgrades now run through an ordered migration list to keep future updates safer.
 
 ### Fixed
 - Fixed a bug where a destination conflict could rename a file mid-move into a numbered duplicate that Dry Run never showed.

@@ -58,7 +58,7 @@ struct QuickPanelView: View {
                 HStack(spacing: 10) {
                     StatTile(icon: "folder", label: "Folders", value: "\(model.folders.count)")
                     StatTile(icon: "list.bullet", label: "Rules", value: "\(model.rules.count)")
-                    StatTile(icon: "clock.arrow.circlepath", label: "History", value: "\(model.history.count)")
+                    StatTile(icon: "clock.arrow.circlepath", label: "History", value: "\(model.historyTotalCount)")
                 }
 
                 Divider().overlay(ForelTheme.divider)
