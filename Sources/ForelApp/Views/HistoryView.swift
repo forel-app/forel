@@ -13,7 +13,7 @@ struct HistoryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            ViewHeader(title: "Activity", subtitle: "\(model.history.count) recorded action\(model.history.count == 1 ? "" : "s")") {
+            ViewHeader(title: "Activity", subtitle: "\(model.historyTotalCount) recorded action\(model.historyTotalCount == 1 ? "" : "s")") {
                 Button {
                     model.detailRoute = .rules
                 } label: {
@@ -21,6 +21,31 @@ struct HistoryView: View {
                 }
                 .buttonStyle(IconButtonStyle())
                 .help("Back to rules")
+            }
+
+            HStack(spacing: 8) {
+                Image(systemName: "folder")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(ForelTheme.secondaryText)
+                Picker("Directory", selection: Binding(
+                    get: { model.historyFolderFilterId ?? "" },
+                    set: { model.setHistoryFolderFilter($0.isEmpty ? nil : $0) }
+                )) {
+                    Text("All directories").tag("")
+                    ForEach(model.folders, id: \.id) { folder in
+                        Text((folder.path as NSString).lastPathComponent).tag(folder.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(maxWidth: 220, alignment: .leading)
+
+                Spacer()
+
+                if model.isLoadingHistory {
+                    ProgressView()
+                        .controlSize(.small)
+                }
             }
 
             ScrollView {
@@ -39,6 +64,14 @@ struct HistoryView: View {
                             }
                             BatchHistorySection(entries: batch.entries)
                         }
+                    }
+
+                    if model.hasMoreHistory {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .onAppear { model.loadMoreHistoryIfNeeded() }
                     }
 
                     if batches.isEmpty {
@@ -108,6 +141,7 @@ private struct HistoryFileGroup: Identifiable {
 }
 
 private struct BatchHistorySection: View {
+    @EnvironmentObject var model: AppModel
     let entries: [HistoryEntry]
 
     private var groups: [HistoryFileGroup] {
@@ -137,6 +171,7 @@ private struct BatchHistorySection: View {
 
                     ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
                         HistoryRow(entry: entry)
+                            .onAppear { model.loadMoreHistoryIfNeeded(currentEntry: entry) }
                         if index != group.entries.count - 1 {
                             Divider().overlay(ForelTheme.divider).padding(.leading, 46)
                         }

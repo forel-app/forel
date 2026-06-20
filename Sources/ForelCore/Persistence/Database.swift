@@ -134,6 +134,8 @@ public final class Database: @unchecked Sendable {
             );
             CREATE INDEX IF NOT EXISTS idx_action_history_batch ON action_history(batch_id);
             CREATE INDEX IF NOT EXISTS idx_action_history_created ON action_history(created_at);
+            CREATE INDEX IF NOT EXISTS idx_action_history_original_path ON action_history(original_path);
+            CREATE INDEX IF NOT EXISTS idx_action_history_result_path ON action_history(result_path);
 
             CREATE TABLE IF NOT EXISTS app_settings (
                 key   TEXT PRIMARY KEY,
@@ -334,11 +336,22 @@ public final class Database: @unchecked Sendable {
         }
     }
 
-    public func listHistory() throws -> [HistoryEntry] {
-        let stmt = try statement("SELECT \(Self.historyColumns) FROM action_history ORDER BY created_at DESC")
+    public func listHistory(limit: Int? = nil, offset: Int = 0, directoryPath: String? = nil) throws -> [HistoryEntry] {
+        let (whereClause, bindings) = Self.historyDirectoryFilter(directoryPath)
+        let limitClause = limit.map { " LIMIT \($0) OFFSET \(max(offset, 0))" } ?? ""
+        let stmt = try statement("SELECT \(Self.historyColumns) FROM action_history\(whereClause) ORDER BY created_at DESC, id DESC\(limitClause)")
+        bindHistoryDirectoryFilter(bindings, to: stmt)
         var entries: [HistoryEntry] = []
         while try stmt.step() { entries.append(rowToHistoryEntry(stmt)) }
         return entries
+    }
+
+    public func countHistory(directoryPath: String? = nil) throws -> Int {
+        let (whereClause, bindings) = Self.historyDirectoryFilter(directoryPath)
+        let stmt = try statement("SELECT COUNT(*) FROM action_history\(whereClause)")
+        bindHistoryDirectoryFilter(bindings, to: stmt)
+        _ = try stmt.step()
+        return Int(stmt.columnInt64(0))
     }
 
     public func getHistoryEntry(_ id: String) throws -> HistoryEntry? {
@@ -364,6 +377,41 @@ public final class Database: @unchecked Sendable {
 
     public func clearHistory() throws {
         try exec("DELETE FROM action_history")
+    }
+
+    private static func historyDirectoryFilter(_ directoryPath: String?) -> (String, [String]) {
+        guard let directoryPath else { return ("", []) }
+        let path = (directoryPath as NSString).standardizingPath
+        let childPattern = historyChildPattern(for: path)
+        return (
+            " WHERE original_path = ?1 OR result_path = ?2 OR original_path LIKE ?3 ESCAPE '\\' OR result_path LIKE ?4 ESCAPE '\\'",
+            [path, path, childPattern, childPattern]
+        )
+    }
+
+    private static func historyChildPattern(for directoryPath: String) -> String {
+        let base = directoryPath == "/" || directoryPath.hasSuffix("/") ? directoryPath : directoryPath + "/"
+        return escapeLikePattern(base) + "%"
+    }
+
+    private static func escapeLikePattern(_ value: String) -> String {
+        var escaped = ""
+        for character in value {
+            switch character {
+            case "\\", "%", "_":
+                escaped.append("\\")
+                escaped.append(character)
+            default:
+                escaped.append(character)
+            }
+        }
+        return escaped
+    }
+
+    private func bindHistoryDirectoryFilter(_ bindings: [String], to stmt: SQLiteStatement) {
+        for (index, value) in bindings.enumerated() {
+            stmt.bind(Int32(index + 1), value)
+        }
     }
 
     // MARK: - Watched folders

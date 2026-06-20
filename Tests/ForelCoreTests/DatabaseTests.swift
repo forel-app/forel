@@ -254,6 +254,57 @@ import SQLite3
         #expect(try db.listHistory().isEmpty)
     }
 
+    @Test func historyCanBePagedAndFilteredByDirectory() throws {
+        let db = try makeDB()
+        let entries = [
+            HistoryEntry(
+                id: "older",
+                batchId: "batch-1",
+                ruleId: "rule",
+                ruleName: "demo",
+                actionKind: .moveToFolder,
+                originalPath: "/tmp/inbox/a.txt",
+                resultPath: "/tmp/archive/a.txt",
+                undo: .object(["kind": .string("none")]),
+                reversible: true,
+                createdAt: "2026-06-20T10:00:00Z"
+            ),
+            HistoryEntry(
+                id: "newer",
+                batchId: "batch-2",
+                ruleId: "rule",
+                ruleName: "demo",
+                actionKind: .moveToFolder,
+                originalPath: "/tmp/inbox/sub/b.txt",
+                resultPath: "/tmp/archive/b.txt",
+                undo: .object(["kind": .string("none")]),
+                reversible: true,
+                createdAt: "2026-06-20T11:00:00Z"
+            ),
+            HistoryEntry(
+                id: "prefix-neighbor",
+                batchId: "batch-3",
+                ruleId: "rule",
+                ruleName: "demo",
+                actionKind: .moveToFolder,
+                originalPath: "/tmp/inbox-other/c.txt",
+                resultPath: "/tmp/archive/c.txt",
+                undo: .object(["kind": .string("none")]),
+                reversible: true,
+                createdAt: "2026-06-20T12:00:00Z"
+            ),
+        ]
+        try db.insertHistoryEntries(entries)
+
+        #expect(try db.countHistory() == 3)
+        #expect(try db.listHistory(limit: 1).map(\.id) == ["prefix-neighbor"])
+        #expect(try db.listHistory(limit: 1, offset: 1).map(\.id) == ["newer"])
+
+        let filtered = try db.listHistory(limit: 10, directoryPath: "/tmp/inbox")
+        #expect(try db.countHistory(directoryPath: "/tmp/inbox") == 2)
+        #expect(filtered.map(\.id) == ["newer", "older"])
+    }
+
     @Test func migrationRejectsNewerSchemaVersions() throws {
         let path = NSTemporaryDirectory().appending("forel-db-test-\(UUID().uuidString).sqlite")
         defer { try? FileManager.default.removeItem(atPath: path) }
