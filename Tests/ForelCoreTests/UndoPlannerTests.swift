@@ -154,6 +154,98 @@ import Foundation
         #expect(FileManager.default.fileExists(atPath: moved))
     }
 
+    @Test func undoBlockedWhenAnActiveRuleWouldImmediatelyReprocessTheRestoredFile() throws {
+        let dir = TempDir()
+        let original = (dir.path as NSString).appendingPathComponent("a.txt")
+        let destination = dir.dir("Archive")
+        let moved = (destination as NSString).appendingPathComponent("a.txt")
+        try "hi".write(toFile: moved, atomically: true, encoding: .utf8)
+
+        var archiveRule = makeRule(name: "archive txt", conditions: [makeCondition(.extension_, .is, "txt")])
+        archiveRule.actions = [makeAction(.moveToFolder, .object(["destination": .string(destination)]), position: 0, ruleId: archiveRule.id)]
+
+        let entry = moveHistoryEntry(from: original, to: moved)
+        let result = UndoPlanner.apply(entry, recentEvents: [], activeRules: [archiveRule], watchedRoot: dir.path)
+
+        guard case .blocked(let reason) = result.outcome else {
+            Issue.record("expected blocked outcome")
+            return
+        }
+        #expect(reason.contains("archive txt"))
+        // Never moved back: the file must still be exactly where it was.
+        #expect(FileManager.default.fileExists(atPath: moved))
+        #expect(!FileManager.default.fileExists(atPath: original))
+    }
+
+    @Test func undoSafeWhenNoActiveRuleMatchesTheRestoredPath() throws {
+        let dir = TempDir()
+        let original = (dir.path as NSString).appendingPathComponent("a.txt")
+        let destination = dir.dir("Archive")
+        let moved = (destination as NSString).appendingPathComponent("a.txt")
+        try "hi".write(toFile: moved, atomically: true, encoding: .utf8)
+
+        var pngRule = makeRule(name: "archive png", conditions: [makeCondition(.extension_, .is, "png")])
+        pngRule.actions = [makeAction(.moveToFolder, .object(["destination": .string(destination)]), position: 0, ruleId: pngRule.id)]
+
+        let entry = moveHistoryEntry(from: original, to: moved)
+        let result = UndoPlanner.apply(entry, recentEvents: [], activeRules: [pngRule], watchedRoot: dir.path)
+
+        #expect(result.outcome == .applied)
+        #expect(FileManager.default.fileExists(atPath: original))
+    }
+
+    @Test func copyUndoIgnoresActiveRulesSinceNothingIsRestored() throws {
+        let dir = TempDir()
+        let original = dir.file("a.txt", contents: "hi")
+        let destination = dir.dir("Backup")
+        let copy = (destination as NSString).appendingPathComponent("a.txt")
+        try FileManager.default.copyItem(atPath: original, toPath: copy)
+
+        // A rule that would obviously match the (untouched) original file —
+        // must not block the copy-undo, since copy-undo only deletes the
+        // copy and never restores anything to `originalPath`.
+        var rule = makeRule(name: "archive txt", conditions: [makeCondition(.extension_, .is, "txt")])
+        rule.actions = [makeAction(.moveToFolder, .object(["destination": .string(destination)]), position: 0, ruleId: rule.id)]
+
+        let entry = HistoryEntry(
+            batchId: "batch-1",
+            ruleId: "rule-1",
+            ruleName: "backup",
+            actionKind: .copyToFolder,
+            originalPath: original,
+            resultPath: original,
+            undo: Undo.copy(copy: copy).toJSON(),
+            reversible: true,
+            status: .applied
+        )
+        let result = UndoPlanner.apply(entry, recentEvents: [], activeRules: [rule], watchedRoot: dir.path)
+
+        #expect(result.outcome == .applied)
+        #expect(!FileManager.default.fileExists(atPath: copy))
+    }
+
+    @Test func applyBatchResolvesActiveRulesPerEntry() throws {
+        let dir = TempDir()
+        let original = (dir.path as NSString).appendingPathComponent("a.txt")
+        let destination = dir.dir("Archive")
+        let moved = (destination as NSString).appendingPathComponent("a.txt")
+        try "hi".write(toFile: moved, atomically: true, encoding: .utf8)
+
+        var archiveRule = makeRule(name: "archive txt", conditions: [makeCondition(.extension_, .is, "txt")])
+        archiveRule.actions = [makeAction(.moveToFolder, .object(["destination": .string(destination)]), position: 0, ruleId: archiveRule.id)]
+
+        let entry = moveHistoryEntry(from: original, to: moved)
+        let results = UndoPlanner.applyBatch([entry], recentEvents: []) { _ in
+            (rules: [archiveRule], watchedRoot: dir.path)
+        }
+
+        guard case .blocked = results[0].outcome else {
+            Issue.record("expected blocked outcome")
+            return
+        }
+        #expect(FileManager.default.fileExists(atPath: moved))
+    }
+
     @Test func undoCreatesAnUndoSourcedEvent() throws {
         let dir = TempDir()
         let original = (dir.path as NSString).appendingPathComponent("a.txt")

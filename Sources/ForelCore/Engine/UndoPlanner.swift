@@ -32,7 +32,18 @@ public enum UndoPlanner {
     /// `recentEvents` should be every `FilesystemEvent` Forel has observed
     /// for `entry.resultPath` (or the identity it last had), so a change
     /// that happened after this action can be detected.
-    public static func evaluate(_ entry: HistoryEntry, recentEvents: [FilesystemEvent]) -> UndoSafety {
+    ///
+    /// `activeRules`/`watchedRoot` are the enabled rules and watched-folder
+    /// root currently covering `entry.originalPath`, if any — pass them so
+    /// undo refuses to put a file right back somewhere an active rule would
+    /// immediately reprocess it (the watcher would otherwise just redo what
+    /// the user explicitly asked to undo).
+    public static func evaluate(
+        _ entry: HistoryEntry,
+        recentEvents: [FilesystemEvent],
+        activeRules: [Rule] = [],
+        watchedRoot: String? = nil
+    ) -> UndoSafety {
         guard entry.reversible else {
             return .unsafeToUndo(reason: "This action cannot be undone.")
         }
@@ -64,6 +75,12 @@ public enum UndoPlanner {
             }
         }
 
+        // Copy-undo only deletes the copy; the original file is never
+        // restored anywhere, so there's nothing for a rule to reprocess.
+        if !isCopyUndo(undo), let ruleName = ruleThatWouldReprocess(entry, activeRules: activeRules, watchedRoot: watchedRoot) {
+            return .unsafeToUndo(reason: "The rule \"\(ruleName)\" would immediately reprocess this file once it's restored.")
+        }
+
         if let newerEvent = recentEvents.first(where: { isNewerThanAction($0, entry: entry) }) {
             return .needsConfirmation(reason: "Forel saw another change to this file after this action (\(newerEvent.kind.rawValue)).")
         }
@@ -74,8 +91,14 @@ public enum UndoPlanner {
     /// Reverses `entry` if it's safe (or `allowNeedsConfirmation` and it
     /// merely needs confirmation), recording a new history entry/event for
     /// the undo itself. Never mutates the filesystem when blocked.
-    public static func apply(_ entry: HistoryEntry, recentEvents: [FilesystemEvent], allowNeedsConfirmation: Bool = false) -> UndoExecutionResult {
-        let safety = evaluate(entry, recentEvents: recentEvents)
+    public static func apply(
+        _ entry: HistoryEntry,
+        recentEvents: [FilesystemEvent],
+        activeRules: [Rule] = [],
+        watchedRoot: String? = nil,
+        allowNeedsConfirmation: Bool = false
+    ) -> UndoExecutionResult {
+        let safety = evaluate(entry, recentEvents: recentEvents, activeRules: activeRules, watchedRoot: watchedRoot)
         switch safety {
         case .unsafeToUndo(let reason):
             return UndoExecutionResult(entryId: entry.id, outcome: .blocked(reason: reason), history: [], events: [])
@@ -118,11 +141,27 @@ public enum UndoPlanner {
     }
 
     /// Undoes a batch in reverse chronological order, the same order their
-    /// effects must be peeled back in.
-    public static func applyBatch(_ entries: [HistoryEntry], recentEvents: [FilesystemEvent], allowNeedsConfirmation: Bool = false) -> [UndoExecutionResult] {
+    /// effects must be peeled back in. `activeRules` resolves the enabled
+    /// rules/watched-root covering each entry's original path individually,
+    /// since a batch can span multiple watched folders.
+    public static func applyBatch(
+        _ entries: [HistoryEntry],
+        recentEvents: [FilesystemEvent],
+        allowNeedsConfirmation: Bool = false,
+        activeRules: (HistoryEntry) -> (rules: [Rule], watchedRoot: String?) = { _ in ([], nil) }
+    ) -> [UndoExecutionResult] {
         entries
             .sorted { $0.createdAt > $1.createdAt }
-            .map { apply($0, recentEvents: recentEvents, allowNeedsConfirmation: allowNeedsConfirmation) }
+            .map { entry in
+                let context = activeRules(entry)
+                return apply(
+                    entry,
+                    recentEvents: recentEvents,
+                    activeRules: context.rules,
+                    watchedRoot: context.watchedRoot,
+                    allowNeedsConfirmation: allowNeedsConfirmation
+                )
+            }
     }
 
     private static func identityChanged(_ entry: HistoryEntry, currentPath: String) -> String? {
@@ -137,5 +176,26 @@ public enum UndoPlanner {
         guard event.createdAt > entry.createdAt else { return false }
         guard !event.isForelOriginated else { return false }
         return true
+    }
+
+    private static func isCopyUndo(_ undo: Undo) -> Bool {
+        if case .copy = undo { return true }
+        return false
+    }
+
+    /// Name of the first active rule that would plan a `wouldRun` action
+    /// against `entry.originalPath` if the file were there right now.
+    /// `name`/`extension` conditions work from the path string alone, so
+    /// this is accurate for them even though the file doesn't physically
+    /// exist there yet; conditions that read the file itself (size, tags,
+    /// dates, contents) just won't match before the restore actually
+    /// happens, which only means a rule keyed on those won't be caught here.
+    private static func ruleThatWouldReprocess(_ entry: HistoryEntry, activeRules: [Rule], watchedRoot: String?) -> String? {
+        guard let watchedRoot, !activeRules.isEmpty else { return nil }
+        guard let depth = RuleEngine.pathDepth(root: watchedRoot, path: entry.originalPath) else { return nil }
+        guard let rematch = RulePlanner.planFile(path: entry.originalPath, depth: depth, rules: activeRules, root: watchedRoot) else {
+            return nil
+        }
+        return rematch.rules.first { $0.actions.contains { $0.status == .wouldRun } }?.ruleName
     }
 }

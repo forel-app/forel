@@ -341,6 +341,16 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// The enabled rules and watched root currently covering `path`, if
+    /// watching is actually active there — empty/`nil` when paused or the
+    /// folder is disabled, since the watcher wouldn't reprocess anything in
+    /// that case regardless of what the rules say.
+    private func activeRules(coveringRestorePath path: String) -> (rules: [Rule], watchedRoot: String?) {
+        guard !paused, let folder = try? db.folderForPath(path), folder.enabled else { return ([], nil) }
+        let rules = (try? db.listRules(folderId: folder.id))?.filter(\.enabled) ?? []
+        return (rules, folder.path)
+    }
+
     /// What `UndoPlanner` thinks of undoing `entry` right now, against the
     /// live filesystem — used to decide whether to even show an Undo button,
     /// not just what happens when it's clicked.
@@ -349,7 +359,8 @@ final class AppModel: ObservableObject {
             return .unsafeToUndo(reason: "This action is not currently applied.")
         }
         let recentEvents = (try? db.listFilesystemEvents(path: entry.resultPath)) ?? []
-        return UndoPlanner.evaluate(entry, recentEvents: recentEvents)
+        let context = activeRules(coveringRestorePath: entry.originalPath)
+        return UndoPlanner.evaluate(entry, recentEvents: recentEvents, activeRules: context.rules, watchedRoot: context.watchedRoot)
     }
 
     /// Whether an Undo button for `entry` would actually work right now.
@@ -367,7 +378,8 @@ final class AppModel: ObservableObject {
     func undo(_ entry: HistoryEntry) {
         guard entry.status == .applied else { return }
         let recentEvents = (try? db.listFilesystemEvents(path: entry.resultPath)) ?? []
-        let result = UndoPlanner.apply(entry, recentEvents: recentEvents)
+        let context = activeRules(coveringRestorePath: entry.originalPath)
+        let result = UndoPlanner.apply(entry, recentEvents: recentEvents, activeRules: context.rules, watchedRoot: context.watchedRoot)
         switch result.outcome {
         case .applied:
             try? db.insertHistoryEntries(result.history)
@@ -389,7 +401,9 @@ final class AppModel: ObservableObject {
         let entries = (try? db.listHistoryBatch(batchId)) ?? []
         let undoable = entries.filter { canUndo($0) }
         let recentEvents = undoable.flatMap { (try? db.listFilesystemEvents(path: $0.resultPath)) ?? [] }
-        let results = UndoPlanner.applyBatch(undoable, recentEvents: recentEvents)
+        let results = UndoPlanner.applyBatch(undoable, recentEvents: recentEvents) { entry in
+            activeRules(coveringRestorePath: entry.originalPath)
+        }
 
         var failures: [String] = []
         for result in results {
