@@ -39,7 +39,7 @@ final class AppModel: ObservableObject {
 
     let db: Database
     private let coordinator: WatcherCoordinator
-    private let historyPageSize = 50
+    private let historyPageSize = 200
     private let previewMatchLimit = 500
 
     init() throws {
