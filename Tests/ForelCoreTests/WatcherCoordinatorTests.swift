@@ -29,6 +29,33 @@ import CoreServices
         #expect(try db.listHistory().count == 1)
     }
 
+    /// Regression test for a reported bug: a duplicate/coalesced FSEvent for
+    /// the *original* path of a file the watcher just successfully moved
+    /// away must not be replanned and fail with a noisy "source file no
+    /// longer exists" entry — there's nothing left there to evaluate.
+    @Test func duplicateEventForAnAlreadyMovedAwayPathDoesNotRecordAFailure() throws {
+        let db = try makeDB()
+        let dir = TempDir()
+        let file = dir.file("a.txt")
+        let destination = dir.dir("Archive")
+        let folder = WatchedFolder(path: dir.path)
+        try db.insertFolder(folder)
+        var rule = makeRule(folderId: folder.id, name: "archive")
+        rule.conditions = [makeCondition(.extension_, .is, "txt", ruleId: rule.id)]
+        rule.actions = [makeAction(.moveToFolder, .object(["destination": .string(destination)]), position: 0, ruleId: rule.id)]
+        try db.insertRule(rule)
+
+        let coordinator = WatcherCoordinator(db: db)
+        coordinator.handle(path: file, flags: UInt32(kFSEventStreamEventFlagItemCreated))
+        // A second, duplicate FSEvent for the now-vacated original path —
+        // the file is gone, moved by the first call above.
+        coordinator.handle(path: file, flags: UInt32(kFSEventStreamEventFlagItemCreated))
+
+        let history = try db.listHistory()
+        #expect(history.count == 1)
+        #expect(history[0].status == .applied)
+    }
+
     /// Regression test for a reported bug: moving a file into a subfolder
     /// (rule 1) must not prevent a second, deeper-scoped rule (rule 2) from
     /// still applying to it at its new location. The move's own follow-up

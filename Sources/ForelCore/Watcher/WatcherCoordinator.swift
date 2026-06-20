@@ -46,6 +46,14 @@ public final class WatcherCoordinator: @unchecked Sendable {
 
     func handle(path: String, flags: UInt32) {
         journalFSEvent(path: path, flags: flags)
+
+        // A duplicate/coalesced FSEvent for a path a prior (serial) call
+        // already moved away — common with FSEvents — would otherwise be
+        // planned anew (name/extension conditions don't require the file to
+        // exist) and then fail at execution with a noisy "source file no
+        // longer exists" entry. Nothing meaningful can be evaluated against
+        // a path that's already gone, so just stop here.
+        guard FileManager.default.fileExists(atPath: path) else { return }
         guard hasFileChangedSinceLastEvaluation(path) else { return }
 
         guard let (folder, rules) = db.withLock({ db -> (WatchedFolder, [Rule])? in
