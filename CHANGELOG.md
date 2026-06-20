@@ -3,9 +3,9 @@
 All notable changes to Forel are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.0.0] - 2026-06-21
 
-🎉🍾 **Forel is exiting beta.** This release marks the transition to a stable, production-ready build — faster, safer, and ready for everyday use. No more beta tag, no more caveats.
+🎉🍾 **Forel is exiting beta.** This release marks the transition to a stable. Faster, safer, and ready for everyday use.
 
 ### Added
 - Added an options button to the Rename action with a "Clean file name" toggle that strips accents and special characters, lowercases, and converts camelCase and spaces to hyphens.
