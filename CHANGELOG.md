@@ -8,6 +8,7 @@ All notable changes to Forel are documented here. Format loosely follows
 ### Added
 - Added a directory filter and paginated loading to Activity so large histories open faster.
 - Added an option to Move to Folder and Copy to Folder rules for handling a file that already exists at the destination: rename the new file (default), replace the existing file (sent to the Trash, not deleted), or skip the file to avoid creating a duplicate.
+- Added a History retention setting to limit stored activity entries, with automatic background cleanup of entries older than the configured number of days.
 
 ### Changed
 - Dry Run, Run Now, and the automatic watcher now always agree on what a rule would do to a file, including which files are skipped, blocked, or already sorted — no more surprises between a preview and what actually happens.

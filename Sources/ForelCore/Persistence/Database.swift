@@ -281,6 +281,13 @@ public final class Database: @unchecked Sendable {
         try exec("DELETE FROM action_history")
     }
 
+    public func purgeHistory(before days: Int) throws {
+        let cutoff = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-Double(days) * 86400))
+        let stmt = try statement("DELETE FROM action_history WHERE created_at < ?1")
+        stmt.bind(1, cutoff)
+        try stmt.runToCompletion()
+    }
+
     private static func historyDirectoryFilter(_ directoryPath: String?) -> (String, [String]) {
         guard let directoryPath else { return ("", []) }
         let path = (directoryPath as NSString).standardizingPath

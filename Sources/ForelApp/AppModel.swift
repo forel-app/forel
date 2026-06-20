@@ -3,6 +3,8 @@ import ForelCore
 import Combine
 import AppKit
 
+private let historyCleanupInterval: TimeInterval = 3600
+
 /// Central observable state for the SwiftUI app: owns the database, the
 /// watcher coordinator, and the in-memory view of folders/rules. Mirrors the
 /// surface of the old `useForelStore` Zustand store, but as direct Swift
@@ -27,6 +29,7 @@ final class AppModel: ObservableObject {
     @Published var appTheme: AppTheme = .system
     @Published var accentPreset: AccentPreset = .default
     @Published var showDockIcon: Bool = true
+    @Published var historyMaxDays: Int = 30
     /// Bumped whenever the accent colour changes, so views can force a full
     /// re-render with `.id(model.accentVersion)` — `ForelTheme.accent` is a
     /// plain static var, not itself observable.
@@ -41,6 +44,7 @@ final class AppModel: ObservableObject {
     private let coordinator: WatcherCoordinator
     private let historyPageSize = 200
     private let previewMatchLimit = 500
+    private var historyCleanupTimer: AnyCancellable?
 
     init() throws {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -70,8 +74,12 @@ final class AppModel: ObservableObject {
         let storedShowDockIcon = try? db.getSetting("show_dock_icon")
         self.showDockIcon = storedShowDockIcon.map { $0 == "1" } ?? true
 
+        let storedMaxDays = (try? db.getSetting("history_max_days")).flatMap { Int($0) }
+        self.historyMaxDays = min(max(storedMaxDays ?? 30, 1), 30)
+
         reloadFolders()
         startWatchingEnabledFolders()
+        startHistoryCleanupTimer()
     }
 
     func applyDockIconPreference(keepingWindowsVisible: Bool = false) {
@@ -124,6 +132,28 @@ final class AppModel: ObservableObject {
         ForelTheme.apply(preset)
         accentVersion += 1
         try? db.setSetting("accent_color", preset.rawValue)
+    }
+
+    func setHistoryMaxDays(_ days: Int) {
+        let clamped = min(max(days, 1), 30)
+        guard clamped != historyMaxDays else { return }
+        historyMaxDays = clamped
+        try? db.setSetting("history_max_days", "\(clamped)")
+        runHistoryCleanup()
+    }
+
+    private func runHistoryCleanup() {
+        let days = historyMaxDays
+        Task.detached(priority: .background) { [db] in
+            try? db.purgeHistory(before: days)
+        }
+    }
+
+    private func startHistoryCleanupTimer() {
+        historyCleanupTimer = Timer.publish(every: historyCleanupInterval, tolerance: 60, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in self?.runHistoryCleanup() }
+        runHistoryCleanup()
     }
 
     func reloadFolders() {

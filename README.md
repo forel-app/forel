@@ -166,12 +166,12 @@ forel/
 - [x] Drag & drop to reorder rules
 - [x] Rules based metadata files
 - [x] Activity logs
+- [x] Automatic cleaning database
 - [ ] Archive / Unarchive actions
 - [ ] Compress actions
 - [ ] Sync actions
 - [ ] Upload actions
 - [ ] Native notifications on rule actions
-- [ ] Automatic cleaning database
 - [ ] AI features
 
 ---
