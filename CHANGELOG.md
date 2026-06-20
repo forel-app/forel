@@ -5,6 +5,8 @@ All notable changes to Forel are documented here. Format loosely follows
 
 ## [Unreleased]
 
+🎉🍾 **Forel is exiting beta.** This release marks the transition to a stable, production-ready build — faster, safer, and ready for everyday use. No more beta tag, no more caveats.
+
 ### Added
 - Added a directory filter and paginated loading to Activity so large histories open faster.
 - Added an option to Move to Folder and Copy to Folder rules for handling a file that already exists at the destination: rename the new file (default), replace the existing file (sent to the Trash, not deleted), or skip the file to avoid creating a duplicate.
