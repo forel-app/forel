@@ -6,7 +6,7 @@ import Foundation
 /// schema exactly so the existing alpha database at
 /// `~/Library/Application Support/com.forel.app/forel.db` keeps working.
 public final class Database: @unchecked Sendable {
-    public static let currentSchemaVersion: Int64 = 7
+    public static let currentSchemaVersion: Int64 = 8
 
     private let handle: OpaquePointer
     private let lock = NSLock()
@@ -32,17 +32,17 @@ public final class Database: @unchecked Sendable {
         return try body(self)
     }
 
-    private func exec(_ sql: String) throws {
+    func exec(_ sql: String) throws {
         if sqlite3_exec(handle, sql, nil, nil, nil) != SQLITE_OK {
             throw SQLiteError(String(cString: sqlite3_errmsg(handle)))
         }
     }
 
-    private func statement(_ sql: String) throws -> SQLiteStatement {
+    func statement(_ sql: String) throws -> SQLiteStatement {
         try SQLiteStatement(handle, sql)
     }
 
-    private func tableHasColumn(_ table: String, _ column: String) throws -> Bool {
+    func tableHasColumn(_ table: String, _ column: String) throws -> Bool {
         let stmt = try statement("PRAGMA table_info(\(table))")
         while try stmt.step() {
             if stmt.columnText(1) == column { return true }
@@ -50,17 +50,17 @@ public final class Database: @unchecked Sendable {
         return false
     }
 
-    private func userVersion() throws -> Int64 {
+    func userVersion() throws -> Int64 {
         let stmt = try statement("PRAGMA user_version")
         _ = try stmt.step()
         return stmt.columnInt64(0)
     }
 
-    private func setUserVersion(_ version: Int64) throws {
+    func setUserVersion(_ version: Int64) throws {
         try exec("PRAGMA user_version = \(version)")
     }
 
-    private func transaction(_ body: () throws -> Void) throws {
+    func transaction(_ body: () throws -> Void) throws {
         try exec("BEGIN IMMEDIATE")
         do {
             try body()
@@ -152,104 +152,6 @@ public final class Database: @unchecked Sendable {
             """
         )
         try runMigrations()
-    }
-
-    private func runMigrations() throws {
-        let version = try userVersion()
-        if version > Self.currentSchemaVersion {
-            throw SQLiteError("database schema version \(version) is newer than supported \(Self.currentSchemaVersion)")
-        }
-        if version < 1 { try runMigration(1) { try self.migrateV1AddRecursionDepth() } }
-        if version < 2 { try runMigration(2) { try self.migrateV2AddActionHistory() } }
-        if version < 3 { try runMigration(3) { try self.migrateV3AddAppSettings() } }
-        if version < 4 { try runMigration(4) { try self.migrateV4AddHistoryMessage() } }
-        if version < 5 { try runMigration(5) { try self.migrateV5AddFolderPriority() } }
-        if version < 6 { try runMigration(6) { try self.migrateV6AddWatchedPathState() } }
-        if version < 7 { try runMigration(7) { try self.migrateV7AddHistoryResultIdentity() } }
-    }
-
-    private func runMigration(_ version: Int64, _ apply: () throws -> Void) throws {
-        try transaction {
-            try apply()
-            try setUserVersion(version)
-        }
-    }
-
-    private func migrateV1AddRecursionDepth() throws {
-        if try tableHasColumn("rules", "recursion_depth") { return }
-        try exec("ALTER TABLE rules ADD COLUMN recursion_depth INTEGER NOT NULL DEFAULT 0;")
-    }
-
-    private func migrateV2AddActionHistory() throws {
-        try exec(
-            """
-            CREATE TABLE IF NOT EXISTS action_history (
-                id            TEXT PRIMARY KEY,
-                batch_id      TEXT NOT NULL,
-                rule_id       TEXT,
-                rule_name     TEXT NOT NULL,
-                action_kind   TEXT NOT NULL,
-                original_path TEXT NOT NULL,
-                result_path   TEXT NOT NULL,
-                undo          TEXT NOT NULL,
-                reversible    INTEGER NOT NULL DEFAULT 0,
-                status        TEXT NOT NULL DEFAULT 'applied',
-                message       TEXT,
-                created_at    TEXT NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_action_history_batch ON action_history(batch_id);
-            CREATE INDEX IF NOT EXISTS idx_action_history_created ON action_history(created_at);
-            """
-        )
-    }
-
-    private func migrateV3AddAppSettings() throws {
-        try exec("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);")
-    }
-
-    private func migrateV4AddHistoryMessage() throws {
-        if try tableHasColumn("action_history", "message") { return }
-        try exec("ALTER TABLE action_history ADD COLUMN message TEXT;")
-    }
-
-    private func migrateV5AddFolderPriority() throws {
-        if try tableHasColumn("watched_folders", "priority") { return }
-        try exec("ALTER TABLE watched_folders ADD COLUMN priority INTEGER NOT NULL DEFAULT 0;")
-
-        let select = try statement("SELECT id FROM watched_folders ORDER BY created_at")
-        var ids: [String] = []
-        while try select.step() {
-            ids.append(select.columnText(0))
-        }
-        for (index, id) in ids.enumerated() {
-            let update = try statement("UPDATE watched_folders SET priority=?1 WHERE id=?2")
-            update.bind(1, Int64(index))
-            update.bind(2, id)
-            try update.runToCompletion()
-        }
-    }
-
-    private func migrateV6AddWatchedPathState() throws {
-        try exec(
-            """
-            CREATE TABLE IF NOT EXISTS watched_path_state (
-                path        TEXT PRIMARY KEY,
-                volume_id   INTEGER,
-                file_id     INTEGER,
-                fingerprint TEXT,
-                updated_at  TEXT NOT NULL
-            );
-            """
-        )
-    }
-
-    private func migrateV7AddHistoryResultIdentity() throws {
-        if !(try tableHasColumn("action_history", "result_volume_id")) {
-            try exec("ALTER TABLE action_history ADD COLUMN result_volume_id INTEGER;")
-        }
-        if !(try tableHasColumn("action_history", "result_file_id")) {
-            try exec("ALTER TABLE action_history ADD COLUMN result_file_id INTEGER;")
-        }
     }
 
     // MARK: - App settings
