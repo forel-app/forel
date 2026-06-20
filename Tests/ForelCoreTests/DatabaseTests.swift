@@ -8,6 +8,47 @@ import SQLite3
         try Database(path: ":memory:")
     }
 
+    /// Regression test for a crash inside `sqlite3_prepare_v2` caused by
+    /// concurrent, unsynchronized access to the same `Database` from the
+    /// watcher's FSEvents thread and the app's background `Task.detached`
+    /// work at the same time. Every public method must serialize itself.
+    @Test func concurrentAccessFromManyThreadsDoesNotCrashOrCorruptData() throws {
+        let db = try makeDB()
+        let folder = WatchedFolder(path: "/tmp/forel-concurrency-test")
+        try db.insertFolder(folder)
+
+        let iterations = 200
+        DispatchQueue.concurrentPerform(iterations: iterations) { index in
+            switch index % 5 {
+            case 0:
+                let rule = makeRule(folderId: folder.id, name: "rule-\(index)")
+                try? db.insertRule(rule)
+            case 1:
+                _ = try? db.listRules(folderId: folder.id)
+            case 2:
+                let entry = HistoryEntry(
+                    batchId: "batch-\(index)",
+                    ruleId: nil,
+                    ruleName: "rule",
+                    actionKind: .addTag,
+                    originalPath: "/tmp/a-\(index).txt",
+                    resultPath: "/tmp/a-\(index).txt",
+                    undo: Undo.none.toJSON(),
+                    reversible: false
+                )
+                try? db.insertHistoryEntries([entry])
+            case 3:
+                _ = try? db.listHistory()
+            default:
+                _ = try? db.folderForPath("/tmp/forel-concurrency-test/file.txt")
+            }
+        }
+
+        // The point of this test is that none of the above crashed; a
+        // sanity read confirms the connection is still usable afterward.
+        #expect(try db.listFolders().count == 1)
+    }
+
     @Test func ruleRoundTripPreservesTagAndColorVariants() throws {
         let db = try makeDB()
         let folder = WatchedFolder(path: "/tmp/forel-test-\(UUID().uuidString)")

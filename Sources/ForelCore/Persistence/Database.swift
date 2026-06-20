@@ -9,7 +9,11 @@ public final class Database: @unchecked Sendable {
     public static let currentSchemaVersion: Int64 = 8
 
     private let handle: OpaquePointer
-    private let lock = NSLock()
+    /// Recursive because public methods lock themselves and some call other
+    /// public methods internally (e.g. `folderForPath` calls `listFolders`,
+    /// and `withLock` callers often call other locking methods on the same
+    /// thread).
+    private let lock = NSRecursiveLock()
 
     public init(path: String) throws {
         var db: OpaquePointer?
@@ -308,6 +312,7 @@ public final class Database: @unchecked Sendable {
     // MARK: - App settings
 
     public func getSetting(_ key: String) throws -> String? {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement("SELECT value FROM app_settings WHERE key = ?1")
         stmt.bind(1, key)
         guard try stmt.step() else { return nil }
@@ -315,6 +320,7 @@ public final class Database: @unchecked Sendable {
     }
 
     public func setSetting(_ key: String, _ value: String) throws {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement(
             "INSERT INTO app_settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
         )
@@ -326,6 +332,7 @@ public final class Database: @unchecked Sendable {
     // MARK: - Custom tags
 
     public func listCustomTags() throws -> [String] {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement("SELECT name FROM custom_tags ORDER BY name")
         var tags: [String] = []
         while try stmt.step() { tags.append(stmt.columnText(0)) }
@@ -333,6 +340,7 @@ public final class Database: @unchecked Sendable {
     }
 
     public func insertCustomTag(_ name: String) throws {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement("INSERT OR IGNORE INTO custom_tags (name) VALUES (?1)")
         stmt.bind(1, name)
         try stmt.runToCompletion()
@@ -371,6 +379,7 @@ public final class Database: @unchecked Sendable {
     }
 
     public func insertHistoryEntries(_ entries: [HistoryEntry]) throws {
+        lock.lock(); defer { lock.unlock() }
         for entry in entries {
             let stmt = try statement(
                 """
@@ -405,6 +414,7 @@ public final class Database: @unchecked Sendable {
     }
 
     public func listHistory() throws -> [HistoryEntry] {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement("SELECT \(Self.historyColumns) FROM action_history ORDER BY created_at DESC")
         var entries: [HistoryEntry] = []
         while try stmt.step() { entries.append(rowToHistoryEntry(stmt)) }
@@ -412,6 +422,7 @@ public final class Database: @unchecked Sendable {
     }
 
     public func getHistoryEntry(_ id: String) throws -> HistoryEntry? {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement("SELECT \(Self.historyColumns) FROM action_history WHERE id=?1")
         stmt.bind(1, id)
         guard try stmt.step() else { return nil }
@@ -419,6 +430,7 @@ public final class Database: @unchecked Sendable {
     }
 
     public func listHistoryBatch(_ batchId: String) throws -> [HistoryEntry] {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement("SELECT \(Self.historyColumns) FROM action_history WHERE batch_id=?1 ORDER BY created_at")
         stmt.bind(1, batchId)
         var entries: [HistoryEntry] = []
@@ -427,18 +439,21 @@ public final class Database: @unchecked Sendable {
     }
 
     public func markHistoryUndone(_ id: String) throws {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement("UPDATE action_history SET status='undone' WHERE id=?1")
         stmt.bind(1, id)
         try stmt.runToCompletion()
     }
 
     public func clearHistory() throws {
+        lock.lock(); defer { lock.unlock() }
         try exec("DELETE FROM action_history")
     }
 
     // MARK: - Watched folders
 
     public func listFolders() throws -> [WatchedFolder] {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement("SELECT id, path, enabled, priority, created_at FROM watched_folders ORDER BY priority, created_at")
         var folders: [WatchedFolder] = []
         while try stmt.step() {
@@ -448,7 +463,8 @@ public final class Database: @unchecked Sendable {
     }
 
     public func folderForPath(_ path: String) throws -> WatchedFolder? {
-        try listFolders()
+        lock.lock(); defer { lock.unlock() }
+        return try listFolders()
             .filter(\.enabled)
             .filter { Self.isPathPrefix($0.path, of: path) }
             .max { $0.path.count < $1.path.count }
@@ -470,6 +486,7 @@ public final class Database: @unchecked Sendable {
     }
 
     public func insertFolder(_ folder: WatchedFolder) throws {
+        lock.lock(); defer { lock.unlock() }
         let priority = try nextFolderPriority()
         let stmt = try statement("INSERT INTO watched_folders (id, path, enabled, priority, created_at) VALUES (?1,?2,?3,?4,?5)")
         stmt.bind(1, folder.id)
@@ -481,12 +498,14 @@ public final class Database: @unchecked Sendable {
     }
 
     public func deleteFolder(_ id: String) throws {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement("DELETE FROM watched_folders WHERE id=?1")
         stmt.bind(1, id)
         try stmt.runToCompletion()
     }
 
     public func toggleFolder(_ id: String, enabled: Bool) throws {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement("UPDATE watched_folders SET enabled=?1 WHERE id=?2")
         stmt.bind(1, bool: enabled)
         stmt.bind(2, id)
@@ -494,6 +513,7 @@ public final class Database: @unchecked Sendable {
     }
 
     public func reorderFolders(_ folderIds: [String]) throws {
+        lock.lock(); defer { lock.unlock() }
         let current = try listFolders()
         guard current.count == folderIds.count else {
             throw SQLiteError("reorder must include every watched folder")
@@ -518,6 +538,7 @@ public final class Database: @unchecked Sendable {
     // MARK: - Rules
 
     public func listRules(folderId: String) throws -> [Rule] {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement(
             """
             SELECT id, folder_id, name, enabled, condition_match, recursion_depth, priority, created_at
@@ -556,6 +577,7 @@ public final class Database: @unchecked Sendable {
     }
 
     public func insertRule(_ rule: Rule) throws {
+        lock.lock(); defer { lock.unlock() }
         let priority = try nextRulePriority(folderId: rule.folderId)
         try transaction {
             let stmt = try statement(
@@ -580,6 +602,7 @@ public final class Database: @unchecked Sendable {
     }
 
     public func updateRule(_ rule: Rule) throws {
+        lock.lock(); defer { lock.unlock() }
         try transaction {
             let stmt = try statement(
                 "UPDATE rules SET name=?1, enabled=?2, condition_match=?3, recursion_depth=?4, priority=?5 WHERE id=?6"
@@ -606,12 +629,14 @@ public final class Database: @unchecked Sendable {
     }
 
     public func deleteRule(_ id: String) throws {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement("DELETE FROM rules WHERE id=?1")
         stmt.bind(1, id)
         try stmt.runToCompletion()
     }
 
     public func toggleRule(_ id: String, enabled: Bool) throws {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement("UPDATE rules SET enabled=?1 WHERE id=?2")
         stmt.bind(1, bool: enabled)
         stmt.bind(2, id)
@@ -619,6 +644,7 @@ public final class Database: @unchecked Sendable {
     }
 
     public func reorderRules(folderId: String, ruleIds: [String]) throws {
+        lock.lock(); defer { lock.unlock() }
         let current = try listRules(folderId: folderId)
         guard current.count == ruleIds.count else {
             throw SQLiteError("reorder must include every rule in the folder")
@@ -724,6 +750,7 @@ public final class Database: @unchecked Sendable {
     }
 
     public func insertFilesystemEvent(_ event: FilesystemEvent) throws {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement(
             """
             INSERT INTO filesystem_events
@@ -747,12 +774,14 @@ public final class Database: @unchecked Sendable {
     }
 
     public func insertFilesystemEvents(_ events: [FilesystemEvent]) throws {
+        lock.lock(); defer { lock.unlock() }
         try transaction {
             for event in events { try insertFilesystemEvent(event) }
         }
     }
 
     public func listRecentFilesystemEvents(limit: Int = 100) throws -> [FilesystemEvent] {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement("SELECT \(Self.filesystemEventColumns) FROM filesystem_events ORDER BY created_at DESC LIMIT ?1")
         stmt.bind(1, Int64(limit))
         var events: [FilesystemEvent] = []
@@ -761,6 +790,7 @@ public final class Database: @unchecked Sendable {
     }
 
     public func listFilesystemEvents(batchId: String) throws -> [FilesystemEvent] {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement("SELECT \(Self.filesystemEventColumns) FROM filesystem_events WHERE batch_id=?1 ORDER BY created_at")
         stmt.bind(1, batchId)
         var events: [FilesystemEvent] = []
@@ -769,6 +799,7 @@ public final class Database: @unchecked Sendable {
     }
 
     public func listFilesystemEvents(path: String) throws -> [FilesystemEvent] {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement("SELECT \(Self.filesystemEventColumns) FROM filesystem_events WHERE path=?1 ORDER BY created_at")
         stmt.bind(1, path)
         var events: [FilesystemEvent] = []
@@ -779,6 +810,7 @@ public final class Database: @unchecked Sendable {
     // MARK: - File state
 
     public func upsertFileState(_ state: FileState) throws {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement(
             """
             INSERT INTO file_state (path, volume_id, file_id, content_fingerprint, updated_at)
@@ -799,12 +831,14 @@ public final class Database: @unchecked Sendable {
     }
 
     public func deleteFileState(_ path: String) throws {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement("DELETE FROM file_state WHERE path=?1")
         stmt.bind(1, path)
         try stmt.runToCompletion()
     }
 
     public func getFileState(_ path: String) throws -> FileState? {
+        lock.lock(); defer { lock.unlock() }
         let stmt = try statement("SELECT path, volume_id, file_id, content_fingerprint, updated_at FROM file_state WHERE path=?1")
         stmt.bind(1, path)
         guard try stmt.step() else { return nil }
