@@ -6,7 +6,7 @@ import Foundation
 /// schema exactly so the existing alpha database at
 /// `~/Library/Application Support/com.forel.app/forel.db` keeps working.
 public final class Database: @unchecked Sendable {
-    public static let currentSchemaVersion: Int64 = 8
+    public static let currentSchemaVersion: Int64 = 9
 
     private let handle: OpaquePointer
     /// Recursive because public methods lock themselves and some call other
@@ -171,6 +171,14 @@ public final class Database: @unchecked Sendable {
                 updated_at          TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_file_state_volume_file ON file_state(volume_id, file_id);
+
+            CREATE TABLE IF NOT EXISTS watcher_evaluated_state (
+                path                TEXT PRIMARY KEY,
+                volume_id           INTEGER,
+                file_id             INTEGER,
+                content_fingerprint TEXT,
+                updated_at          TEXT NOT NULL
+            );
             """
         )
         try runMigrations()
@@ -189,6 +197,7 @@ public final class Database: @unchecked Sendable {
         if version < 6 { try runMigration(6) { try self.migrateV6AddFilesystemEvents() } }
         if version < 7 { try runMigration(7) { try self.migrateV7AddFileState() } }
         if version < 8 { try runMigration(8) { try self.migrateV8AddHistorySnapshots() } }
+        if version < 9 { try runMigration(9) { try self.migrateV9AddWatcherEvaluatedState() } }
     }
 
     private func runMigration(_ version: Int64, _ apply: () throws -> Void) throws {
@@ -307,6 +316,20 @@ public final class Database: @unchecked Sendable {
             if try tableHasColumn("action_history", name) { continue }
             try exec("ALTER TABLE action_history ADD COLUMN \(column);")
         }
+    }
+
+    private func migrateV9AddWatcherEvaluatedState() throws {
+        try exec(
+            """
+            CREATE TABLE IF NOT EXISTS watcher_evaluated_state (
+                path                TEXT PRIMARY KEY,
+                volume_id           INTEGER,
+                file_id             INTEGER,
+                content_fingerprint TEXT,
+                updated_at          TEXT NOT NULL
+            );
+            """
+        )
     }
 
     // MARK: - App settings
@@ -445,9 +468,20 @@ public final class Database: @unchecked Sendable {
         try stmt.runToCompletion()
     }
 
+    /// Clears everything Forel has recorded about what happened, not just
+    /// the visible action log: the applied-actions history, the observed
+    /// filesystem event journal, and the per-path state cache derived from
+    /// it. Leaving any of those behind would make "Clear History" look
+    /// incomplete — e.g. stale `file_state` rows could still influence
+    /// undo-safety checks for actions that no longer appear anywhere.
     public func clearHistory() throws {
         lock.lock(); defer { lock.unlock() }
-        try exec("DELETE FROM action_history")
+        try transaction {
+            try exec("DELETE FROM action_history")
+            try exec("DELETE FROM filesystem_events")
+            try exec("DELETE FROM file_state")
+            try exec("DELETE FROM watcher_evaluated_state")
+        }
     }
 
     // MARK: - Watched folders
@@ -840,6 +874,54 @@ public final class Database: @unchecked Sendable {
     public func getFileState(_ path: String) throws -> FileState? {
         lock.lock(); defer { lock.unlock() }
         let stmt = try statement("SELECT path, volume_id, file_id, content_fingerprint, updated_at FROM file_state WHERE path=?1")
+        stmt.bind(1, path)
+        guard try stmt.step() else { return nil }
+        return FileState(
+            path: stmt.columnText(0),
+            volumeId: stmt.columnInt64OrNil(1),
+            fileId: stmt.columnInt64OrNil(2),
+            contentFingerprint: stmt.columnTextOrNil(3),
+            updatedAt: stmt.columnText(4)
+        )
+    }
+
+    // MARK: - Watcher evaluated state
+    //
+    // Distinct from `file_state`: that table records the result of an
+    // *applied action* (for undo safety / staleness checks). This one
+    // records that the watcher has already fully evaluated a given path at
+    // a given fingerprint against every rule, regardless of whether any
+    // rule matched — so a duplicate/coalesced FSEvent for the exact same
+    // untouched file doesn't repeat actions that don't self-limit the way
+    // `moveToFolder` does (e.g. `copyToFolder`). A path that's never been
+    // evaluated before — like one a previous rule just moved here — always
+    // gets evaluated, because `file_state`'s bookkeeping for *that* never
+    // touches this table.
+
+    public func upsertWatcherEvaluatedState(_ state: FileState) throws {
+        lock.lock(); defer { lock.unlock() }
+        let stmt = try statement(
+            """
+            INSERT INTO watcher_evaluated_state (path, volume_id, file_id, content_fingerprint, updated_at)
+            VALUES (?1,?2,?3,?4,?5)
+            ON CONFLICT(path) DO UPDATE SET
+                volume_id = excluded.volume_id,
+                file_id = excluded.file_id,
+                content_fingerprint = excluded.content_fingerprint,
+                updated_at = excluded.updated_at
+            """
+        )
+        stmt.bind(1, state.path)
+        stmt.bind(2, state.volumeId)
+        stmt.bind(3, state.fileId)
+        stmt.bind(4, state.contentFingerprint)
+        stmt.bind(5, state.updatedAt)
+        try stmt.runToCompletion()
+    }
+
+    public func getWatcherEvaluatedState(_ path: String) throws -> FileState? {
+        lock.lock(); defer { lock.unlock() }
+        let stmt = try statement("SELECT path, volume_id, file_id, content_fingerprint, updated_at FROM watcher_evaluated_state WHERE path=?1")
         stmt.bind(1, path)
         guard try stmt.step() else { return nil }
         return FileState(

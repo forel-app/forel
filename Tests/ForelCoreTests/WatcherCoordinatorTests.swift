@@ -150,4 +150,33 @@ import CoreServices
         coordinator.handle(path: file, flags: UInt32(kFSEventStreamEventFlagItemModified))
         #expect(try db.listHistory().count == 1)
     }
+
+    /// Regression test for a reported bug: `copyToFolder` never moves its
+    /// source out of scope (unlike `moveToFolder`, which has the
+    /// `alreadyInDestination` no-op), so repeated/duplicate FSEvents for the
+    /// same untouched source kept re-copying — piling up Activity entries
+    /// indefinitely under the watcher, even though Run Now (a single pass)
+    /// never showed the problem.
+    @Test func repeatedEventsForAnUnchangedSourceDoNotPileUpCopies() throws {
+        let db = try makeDB()
+        let dir = TempDir()
+        let file = dir.file("a.png")
+        let destination = dir.dir("PDF")
+        let folder = WatchedFolder(path: dir.path)
+        try db.insertFolder(folder)
+        var rule = makeRule(folderId: folder.id, name: "png copy")
+        rule.conditions = [makeCondition(.extension_, .is, "png", ruleId: rule.id)]
+        rule.actions = [makeAction(.copyToFolder, .object([
+            "destination": .string(destination),
+            "on_conflict": .string("replace"),
+        ]), position: 0, ruleId: rule.id)]
+        try db.insertRule(rule)
+
+        let coordinator = WatcherCoordinator(db: db)
+        for _ in 0..<5 {
+            coordinator.handle(path: file, flags: UInt32(kFSEventStreamEventFlagItemModified))
+        }
+
+        #expect(try db.listHistory().count == 1)
+    }
 }

@@ -46,6 +46,7 @@ public final class WatcherCoordinator: @unchecked Sendable {
 
     func handle(path: String, flags: UInt32) {
         journalFSEvent(path: path, flags: flags)
+        guard hasFileChangedSinceLastEvaluation(path) else { return }
 
         guard let (folder, rules) = db.withLock({ db -> (WatchedFolder, [Rule])? in
             guard let folder = try? db.folderForPath(path) else { return nil }
@@ -54,7 +55,10 @@ public final class WatcherCoordinator: @unchecked Sendable {
         }) else { return }
 
         guard let depth = RuleEngine.pathDepth(root: folder.path, path: path) else { return }
-        guard let plannedFile = RulePlanner.planFile(path: path, depth: depth, rules: rules, root: folder.path) else { return }
+        guard let plannedFile = RulePlanner.planFile(path: path, depth: depth, rules: rules, root: folder.path) else {
+            recordEvaluatedState(path)
+            return
+        }
 
         for plannedRule in plannedFile.rules {
             onRuleMatched?(plannedRule.ruleName, path)
@@ -62,6 +66,7 @@ public final class WatcherCoordinator: @unchecked Sendable {
 
         let plan = ExecutionPlan(folderId: folder.id, status: .ready, files: [plannedFile])
         persist(PlanExecutor.execute(plan))
+        recordEvaluatedState(path)
     }
 
     private func persist(_ result: PlanExecutionResult) {
@@ -72,6 +77,43 @@ public final class WatcherCoordinator: @unchecked Sendable {
             for state in result.fileStateUpserts { try? db.upsertFileState(state) }
             for path in result.fileStateDeletes { try? db.deleteFileState(path) }
         }
+    }
+
+    /// Whether `path` looks different from the last time the watcher fully
+    /// evaluated it (same identity and content fingerprint means nothing
+    /// meaningful changed). Without this, an action that doesn't move the
+    /// file out of scope — `copyToFolder` in particular, which has no
+    /// `alreadyInDestination`-style no-op the way `moveToFolder` does —
+    /// would repeat itself on every duplicate/coalesced FSEvent for the same
+    /// untouched source, piling up copies indefinitely.
+    ///
+    /// This checks the *observed* path itself, not anything an action
+    /// produced, so a path nothing has evaluated before — e.g. a file a
+    /// previous rule just moved here — always proceeds; only a path whose
+    /// own state we've already fully evaluated gets skipped.
+    private func hasFileChangedSinceLastEvaluation(_ path: String) -> Bool {
+        guard let cached = db.withLock({ db in try? db.getWatcherEvaluatedState(path) }) else { return true }
+        guard let currentFingerprint = FileFingerprint.current(path), cached.contentFingerprint == currentFingerprint else {
+            return true
+        }
+        guard let volumeId = cached.volumeId, let fileId = cached.fileId else { return true }
+        guard let identity = FileFingerprint.identity(path) else { return true }
+        return !(identity.volumeId == volumeId && identity.fileId == fileId)
+    }
+
+    private func recordEvaluatedState(_ path: String) {
+        // Nothing meaningful to cache once the file's gone (e.g. it was
+        // just moved away) — and caching a path's only-just-vacated state
+        // would just be inert until something new shows up there anyway.
+        guard FileManager.default.fileExists(atPath: path) else { return }
+        let identity = FileFingerprint.identity(path)
+        let state = FileState(
+            path: path,
+            volumeId: identity?.volumeId,
+            fileId: identity?.fileId,
+            contentFingerprint: FileFingerprint.current(path)
+        )
+        db.withLock { db in try? db.upsertWatcherEvaluatedState(state) }
     }
 
     /// Records the raw FSEvents flag for `path` so the journal distinguishes

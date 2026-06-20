@@ -295,6 +295,21 @@ import SQLite3
         #expect(try db.listHistory().isEmpty)
     }
 
+    @Test func clearHistoryAlsoClearsTheEventJournalAndFileStateCache() throws {
+        let db = try makeDB()
+        try db.insertHistoryEntries([
+            HistoryEntry(batchId: "batch-1", ruleId: "rule", ruleName: "demo", actionKind: .moveToFolder, originalPath: "/from", resultPath: "/to", undo: .object(["kind": .string("none")]), reversible: true),
+        ])
+        try db.insertFilesystemEvent(FilesystemEvent(batchId: "batch-1", source: .scan, kind: .discovered, path: "/from"))
+        try db.upsertFileState(FileState(path: "/to", contentFingerprint: "100-0-0"))
+
+        try db.clearHistory()
+
+        #expect(try db.listHistory().isEmpty)
+        #expect(try db.listRecentFilesystemEvents().isEmpty)
+        #expect(try db.getFileState("/to") == nil)
+    }
+
     @Test func migrationRejectsNewerSchemaVersions() throws {
         let path = NSTemporaryDirectory().appending("forel-db-test-\(UUID().uuidString).sqlite")
         defer { try? FileManager.default.removeItem(atPath: path) }
