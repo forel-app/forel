@@ -165,6 +165,7 @@ public enum ActionParam {
     public static let shortcutInputMode = "shortcut_input_mode"
     public static let cleanFileName = "clean_file_name"
     public static let libraryType = "library_type"
+    public static let targetPlaylist = "target_playlist"
 }
 
 /// The abstract shape of an action parameter; the UI maps it to a concrete editor.
@@ -176,6 +177,7 @@ public enum ActionParamKind: Sendable, Equatable {
     case script
     case shortcut
     case libraryType
+    case playlist
 }
 
 public struct ActionParamSpec: Sendable, Equatable {
@@ -252,7 +254,8 @@ public extension ActionKind {
         case .runShortcut:
             return [ActionParamSpec(key: ActionParam.shortcutName, kind: .shortcut)]
         case .importToLibrary:
-            return [ActionParamSpec(key: ActionParam.libraryType, kind: .libraryType)]
+            return [ActionParamSpec(key: ActionParam.libraryType, kind: .libraryType),
+                    ActionParamSpec(key: ActionParam.targetPlaylist, kind: .playlist)]
         case .moveToTrash, .delete:
             return []
         }

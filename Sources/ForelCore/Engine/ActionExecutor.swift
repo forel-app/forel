@@ -331,7 +331,8 @@ public enum ActionExecutor {
             throw ActionError("File format not supported by \(libraryType.label) — requires \(formatDescription(for: libraryType))")
         }
 
-        try performImport(path: path, libraryType: libraryType)
+        let playlist = action.params[ActionParam.targetPlaylist]?.stringValue ?? ""
+        try performImport(path: path, libraryType: libraryType, playlist: playlist)
         return Applied(newPath: path, undo: .none)
     }
 
@@ -358,10 +359,10 @@ public enum ActionExecutor {
         }
     }
 
-    private static func performImport(path: String, libraryType: LibraryType) throws {
+    private static func performImport(path: String, libraryType: LibraryType, playlist: String = "") throws {
         switch libraryType {
         case .music:
-            try importViaAppleScript(app: "Music", path: path)
+            try importViaAppleScript(app: "Music", path: path, playlist: playlist)
         case .photos:
             try importToPhotos(path: path)
         case .tv:
@@ -395,12 +396,19 @@ public enum ActionExecutor {
         path.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
     }
 
-    private static func importViaAppleScript(app: String, path: String) throws {
-        let escaped = appleScriptEscapePath(path)
+    private static func importViaAppleScript(app: String, path: String, playlist: String = "") throws {
+        let escapedPath = appleScriptEscapePath(path)
+        let playlistClause: String
+        if playlist.isEmpty {
+            playlistClause = ""
+        } else {
+            let escapedPlaylist = appleScriptEscapePath(playlist)
+            playlistClause = " to playlist \"\(escapedPlaylist)\""
+        }
         let script = """
         tell application "\(app)"
-            set theFile to (POSIX file "\(escaped)") as alias
-            add theFile
+            set theFile to (POSIX file "\(escapedPath)") as alias
+            add theFile\(playlistClause)
         end tell
         """
         try runAppleScript(script)

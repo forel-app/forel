@@ -686,7 +686,11 @@ private struct ActionRow: View {
         case .runShortcut:
             ShortcutPicker(selection: paramBinding(ActionParam.shortcutName))
         case .importToLibrary:
-            LibraryTypePicker(selection: paramBinding(ActionParam.libraryType, defaultValue: LibraryType.music.rawValue))
+            let libraryTypeBinding = paramBinding(ActionParam.libraryType, defaultValue: LibraryType.music.rawValue)
+            LibraryTypePicker(selection: libraryTypeBinding)
+            if libraryTypeBinding.wrappedValue == LibraryType.music.rawValue {
+                PlaylistPicker(selection: paramBinding(ActionParam.targetPlaylist))
+            }
         case .moveToTrash, .delete:
             Text("No parameters")
                 .font(.system(size: 11))
@@ -907,6 +911,58 @@ private struct LibraryTypePicker: View {
             label: { value in LibraryType(rawValue: value)?.label ?? value }
         )
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct PlaylistPicker: View {
+    @Binding var selection: String
+    @State private var playlists: [String] = []
+    @State private var isLoading = true
+
+    var body: some View {
+        Group {
+            if isLoading {
+                Text("Loading playlists...")
+                    .font(.system(size: 11))
+                    .foregroundStyle(ForelTheme.secondaryText)
+            } else {
+                StringSelectMenu(
+                    selection: $selection,
+                    options: playlists,
+                    label: { $0.isEmpty ? "Library" : $0 }
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .task { await loadPlaylists() }
+    }
+
+    private func loadPlaylists() async {
+        let script = """
+        tell application "Music"
+            set playlistNames to name of every user playlist
+            set AppleScript's text item delimiters to linefeed
+            return playlistNames as string
+        end tell
+        """
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        task.arguments = ["-e", script]
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        task.standardOutput = outPipe
+        task.standardError = errPipe
+        do {
+            try task.run()
+            task.waitUntilExit()
+            let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+            let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if task.terminationStatus == 0 && !output.isEmpty {
+                let names = output.components(separatedBy: "\n").filter { !$0.isEmpty }
+                await MainActor.run { playlists = [""] + names }
+            }
+        } catch {}
+        await MainActor.run { isLoading = false }
     }
 }
 
