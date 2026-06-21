@@ -174,12 +174,6 @@ forel/
 - [ ] Native notifications on rule actions
 - [ ] AI features
 
----
-> [!WARNING]
-> Forel is currently in **beta**. Expect bugs, missing features, and breaking changes between versions.
-
----
-
 ## Contributing
 
 Forel is in early development and contributions are very welcome.
