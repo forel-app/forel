@@ -13,6 +13,8 @@ All notable changes to Forel are documented here. Format loosely follows
 
 ### Changed
 - Activity and Dry Run text (file paths, messages, rule names) can now be selected and copied.
+- Import to Library now only offers Skip and Replace as conflict options (Rename removed), with Skip as the default.
+- The action kind and condition kind pickers now show SF Symbol icons and are grouped into labelled sections.
 
 ## [1.0.0] - 2026-06-21
 

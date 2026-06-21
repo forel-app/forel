@@ -352,12 +352,28 @@ private struct ConditionKindMenu: View {
                 if let title = group.title {
                     Section(title) {
                         ForEach(group.kinds, id: \.self) { kind in
-                            Button(kind.label) { selection = kind }
+                            Button {
+                                selection = kind
+                            } label: {
+                                HStack {
+                                    Image(systemName: kind.iconSystemName)
+                                        .frame(width: 16)
+                                    Text(kind.label)
+                                }
+                            }
                         }
                     }
                 } else {
                     ForEach(group.kinds, id: \.self) { kind in
-                        Button(kind.label) { selection = kind }
+                        Button {
+                            selection = kind
+                        } label: {
+                            HStack {
+                                Image(systemName: kind.iconSystemName)
+                                    .frame(width: 16)
+                                Text(kind.label)
+                            }
+                        }
                     }
                 }
             }
@@ -383,8 +399,34 @@ private struct ActionKindMenu: View {
 
     var body: some View {
         RuleSelectMenu(title: selection.label) {
-            ForEach(RuleSchema.actionKinds, id: \.self) { kind in
-                Button(kind.label) { selection = kind }
+            ForEach(Array(RuleSchema.actionKindGroups.enumerated()), id: \.offset) { _, group in
+                if let title = group.title {
+                    Section(title) {
+                        ForEach(group.kinds, id: \.self) { kind in
+                            Button {
+                                selection = kind
+                            } label: {
+                                HStack {
+                                    Image(systemName: kind.iconSystemName)
+                                        .frame(width: 16)
+                                    Text(kind.label)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    ForEach(group.kinds, id: \.self) { kind in
+                        Button {
+                            selection = kind
+                        } label: {
+                            HStack {
+                                Image(systemName: kind.iconSystemName)
+                                    .frame(width: 16)
+                                Text(kind.label)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
