@@ -364,9 +364,9 @@ public enum ActionExecutor {
         case .music:
             try importViaAppleScript(app: "Music", path: path, playlist: playlist)
         case .photos:
-            try importToPhotos(path: path)
+            try importToPhotos(path: path, album: playlist)
         case .tv:
-            try importViaAppleScript(app: "TV", path: path)
+            try importViaAppleScript(app: "TV", path: path, playlist: playlist)
         }
     }
 
@@ -413,21 +413,33 @@ public enum ActionExecutor {
         """
         try runAppleScript(script)
     }
-    private static func importToPhotos(path: String) throws {
+    private static func importToPhotos(path: String, album: String = "") throws {
         #if canImport(Photos)
         if let msg = ensureLibraryAccess(libraryType: .photos) {
             throw ActionError("Photos library \(msg)")
         }
         let url = URL(fileURLWithPath: path)
+        var targetAlbum: PHAssetCollection?
+        if !album.isEmpty {
+            let options = PHFetchOptions()
+            options.predicate = NSPredicate(format: "title == %@", album)
+            let collections = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: options)
+            targetAlbum = collections.firstObject
+        }
         try PHPhotoLibrary.shared().performChangesAndWait {
             let ext = url.pathExtension.lowercased()
             let videoExtensions = Set(["mov", "mp4", "m4v", "avi", "mts", "m2ts"])
+            let request: PHAssetChangeRequest?
             if videoExtensions.contains(ext),
                let utType = UTType(filenameExtension: ext),
                utType.conforms(to: .movie) {
-                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
+                request = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
             } else {
-                PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: url)
+                request = PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: url)
+            }
+            if let album = targetAlbum, let placeholder = request?.placeholderForCreatedAsset {
+                let albumRequest = PHAssetCollectionChangeRequest(for: album)
+                albumRequest?.addAssets([placeholder] as NSArray)
             }
         }
         #else

@@ -66,6 +66,38 @@ swift run ForelApp
 - New entries always go under `## [Unreleased]` at the top of `CHANGELOG.md`, never directly under a version header. A version header is only created by renaming `[Unreleased]` when actually cutting that release.
 - Entries must be concise, precise, and user-facing: state what changed and the user-visible effect, no filler, no internal implementation detail (no file/function names, no "we").
 
+## UX & design guidelines
+
+Forel's UI should feel like it belongs on the user's Mac, not like a
+cross-platform app that happens to run on macOS. When adding or changing UI:
+
+- Follow the current [Apple Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines)
+  for macOS — standard control sizes, spacing, and SF Symbols rather than
+  custom-drawn equivalents, unless the existing design system
+  (`Sources/ForelApp/Theme.swift`, `Components.swift`) already defines one.
+- Prefer native SwiftUI/AppKit components and behaviors (sheets, popovers,
+  menus, `.alert`, drag-and-drop, keyboard shortcuts) over hand-rolled ones.
+  A custom control is justified only when no native one fits.
+- Support both Light and Dark mode, and Dynamic Type where practical — verify
+  contrast and readability in both appearances, not just the one in your
+  screenshot.
+- Every destructive or hard-to-reverse action (delete, clear history,
+  irreversible undo) needs a clear, specific confirmation or warning — never
+  a generic "Are you sure?".
+- Long-running work (Run Now, Dry Run on large folders) must show progress or
+  a loading state; the UI should never appear frozen or unresponsive.
+- Errors and blocked actions (e.g. an unsafe undo) get a plain-language
+  explanation of *why*, not just a generic failure message.
+- Favor progressive disclosure: keep the default view simple, push advanced
+  options (e.g. action options popovers) behind an explicit, discoverable
+  affordance — and hide that affordance entirely when there's nothing to show
+  (see `ActionKind.hasOptions`).
+- Text the user might want to copy (file paths, error messages, history
+  entries) should be selectable, not just displayed.
+- When in doubt, match how a well-built native Mac app already solves the
+  same problem (Finder, Mail, System Settings) rather than inventing a new
+  pattern.
+
 ## Notes for contributors
 
 - Keep the codebase macOS-only.

@@ -1,6 +1,9 @@
 import AppKit
 import SwiftUI
 import ForelCore
+#if canImport(Photos)
+import Photos
+#endif
 
 struct RuleEditorView: View {
     @State private var rule: Rule
@@ -686,10 +689,35 @@ private struct ActionRow: View {
         case .runShortcut:
             ShortcutPicker(selection: paramBinding(ActionParam.shortcutName))
         case .importToLibrary:
-            let libraryTypeBinding = paramBinding(ActionParam.libraryType, defaultValue: LibraryType.music.rawValue)
-            LibraryTypePicker(selection: libraryTypeBinding)
-            if libraryTypeBinding.wrappedValue == LibraryType.music.rawValue {
-                PlaylistPicker(selection: paramBinding(ActionParam.targetPlaylist))
+            let libTypeBinding = paramBinding(ActionParam.libraryType, defaultValue: LibraryType.music.rawValue)
+            let libType = LibraryType(rawValue: libTypeBinding.wrappedValue)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Text("Library:")
+                        .font(.system(size: 11))
+                        .foregroundStyle(ForelTheme.secondaryText)
+                        .frame(width: 52, alignment: .trailing)
+                    LibraryTypePicker(selection: libTypeBinding)
+                }
+                if libType == .music || libType == .tv {
+                    let app = libType == .music ? "Music" : "TV"
+                    HStack(spacing: 6) {
+                        Text("Playlist:")
+                            .font(.system(size: 11))
+                            .foregroundStyle(ForelTheme.secondaryText)
+                            .frame(width: 52, alignment: .trailing)
+                        PlaylistPicker(selection: paramBinding(ActionParam.targetPlaylist), app: app)
+                            .id(app)
+                    }
+                } else if libType == .photos {
+                    HStack(spacing: 6) {
+                        Text("Album:")
+                            .font(.system(size: 11))
+                            .foregroundStyle(ForelTheme.secondaryText)
+                            .frame(width: 52, alignment: .trailing)
+                        AlbumPicker(selection: paramBinding(ActionParam.targetPlaylist))
+                    }
+                }
             }
         case .moveToTrash, .delete:
             Text("No parameters")
@@ -762,7 +790,7 @@ private struct ActionOptionsView: View {
             switch action.kind {
             case .runShortcut:
                 shortcutOptions
-            case .moveToFolder, .copyToFolder, .importToLibrary:
+            case .moveToFolder, .copyToFolder:
                 conflictResolutionOptions
             case .rename:
                 renameOptions
@@ -916,30 +944,29 @@ private struct LibraryTypePicker: View {
 
 private struct PlaylistPicker: View {
     @Binding var selection: String
-    @State private var playlists: [String] = []
+    let app: String
+    @State private var items: [String] = [""]
     @State private var isLoading = true
 
     var body: some View {
-        Group {
+        HStack(spacing: 4) {
+            StringSelectMenu(
+                selection: $selection,
+                options: items,
+                label: { $0.isEmpty ? "None" : $0 }
+            )
             if isLoading {
-                Text("Loading playlists...")
-                    .font(.system(size: 11))
-                    .foregroundStyle(ForelTheme.secondaryText)
-            } else {
-                StringSelectMenu(
-                    selection: $selection,
-                    options: playlists,
-                    label: { $0.isEmpty ? "Library" : $0 }
-                )
+                ProgressView()
+                    .controlSize(.small)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .task { await loadPlaylists() }
+        .task { await load() }
     }
 
-    private func loadPlaylists() async {
+    private func load() async {
         let script = """
-        tell application "Music"
+        tell application "\(app)"
             set playlistNames to name of every user playlist
             set AppleScript's text item delimiters to linefeed
             return playlistNames as string
@@ -959,10 +986,52 @@ private struct PlaylistPicker: View {
             let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             if task.terminationStatus == 0 && !output.isEmpty {
                 let names = output.components(separatedBy: "\n").filter { !$0.isEmpty }
-                await MainActor.run { playlists = [""] + names }
+                await MainActor.run { items = [""] + names }
             }
         } catch {}
         await MainActor.run { isLoading = false }
+    }
+}
+
+private struct AlbumPicker: View {
+    @Binding var selection: String
+    @State private var items: [String] = [""]
+    @State private var isLoading = true
+
+    var body: some View {
+        HStack(spacing: 4) {
+            StringSelectMenu(
+                selection: $selection,
+                options: items,
+                label: { $0.isEmpty ? "None" : $0 }
+            )
+            if isLoading {
+                ProgressView()
+                    .controlSize(.small)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .task { await load() }
+    }
+
+    private func load() async {
+        await MainActor.run {
+            #if canImport(Photos)
+            let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+            guard status == .authorized || status == .limited else {
+                isLoading = false
+                return
+            }
+            let options = PHFetchOptions()
+            let collections = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: options)
+            var names: [String] = []
+            collections.enumerateObjects { collection, _, _ in
+                names.append(collection.localizedTitle ?? "Untitled")
+            }
+            items = [""] + names.sorted()
+            #endif
+            isLoading = false
+        }
     }
 }
 
