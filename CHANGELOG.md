@@ -7,9 +7,11 @@ All notable changes to Forel are documented here. Format loosely follows
 
 ### Added
 - Added expandable rule cards that show each rule's conditions and actions directly in the rule list.
+- Each rule now shows its run count from the last 30 days, hidden when there's nothing to show, and the menu bar quick panel has a "Last 30 Days" section with success and failed totals across all rules.
 
 ### Changed
 - Dry Run now shows each matched file's full path beneath its name.
+- Refreshed the menu bar quick panel with a cleaner header, bordered footer buttons, and a background that now properly adapts to Light mode instead of always looking dark and hard to read.
 
 ## [1.0.1] - 2026-06-22
 

@@ -33,6 +33,7 @@ final class AppModel: ObservableObject {
     @Published var folders: [WatchedFolder] = []
     @Published var selectedFolderId: String?
     @Published var rules: [Rule] = []
+    @Published private(set) var ruleRunStats: [RuleRunStats] = []
     @Published var history: [HistoryEntry] = []
     @Published var historyTotalCount: Int = 0
     @Published var historyFolderFilterId: String?
@@ -60,6 +61,7 @@ final class AppModel: ObservableObject {
     private let coordinator: WatcherCoordinator
     private let historyPageSize = 200
     private let previewMatchLimit = 500
+    private let ruleRunStatsWindowDays = 30
     private var historyCleanupTimer: AnyCancellable?
 
     init() throws {
@@ -206,11 +208,27 @@ final class AppModel: ObservableObject {
     func reloadRules() {
         guard let folderId = selectedFolderId else { rules = []; return }
         rules = (try? db.listRules(folderId: folderId)) ?? []
+        reloadRuleRunStats()
     }
 
     func reloadHistory() {
         loadHistoryPage(reset: true)
+        reloadRuleRunStats()
     }
+
+    /// Success/failed run counts per rule over the last `ruleRunStatsWindowDays`
+    /// days — kept in sync with `rules` and `history`, since both can change
+    /// what these totals should be.
+    private func reloadRuleRunStats() {
+        ruleRunStats = (try? db.ruleRunStats(sinceDays: ruleRunStatsWindowDays)) ?? []
+    }
+
+    func runStats(for rule: Rule) -> RuleRunStats? {
+        ruleRunStats.first { $0.id == rule.id }
+    }
+
+    var totalSuccessCount30d: Int { ruleRunStats.reduce(0) { $0 + $1.successCount } }
+    var totalFailedCount30d: Int { ruleRunStats.reduce(0) { $0 + $1.failedCount } }
 
     func loadMoreHistoryIfNeeded(currentEntry entry: HistoryEntry? = nil) {
         guard hasMoreHistory, !isLoadingHistory else { return }
