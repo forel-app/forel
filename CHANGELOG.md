@@ -6,12 +6,16 @@ All notable changes to Forel are documented here. Format loosely follows
 ## [Unreleased]
 
 ### Added
+- Added an Import to Library action that can add files to the Music, Photos, or TV native macOS libraries. When a file is already present you can choose to skip it (leave the library untouched) or replace it (remove the existing entry before re-importing). File format compatibility is checked before each import, and importing into Photos requires granting access in System Settings.
 - The Contents condition now uses on-device Vision OCR and the Apple Neural Engine to extract text from scanned PDFs and images — everything stays private and works offline, with no data sent to the cloud.
 - Added image OCR support for WebP, GIF, BMP, JPEG 2000, and Photoshop files.
 - Added content extraction support for Office template formats (.dotx, .xltx, .potx).
+- Added a Permissions section to Settings showing the status of Photos and Music/TV automation access, with buttons to grant access or open the relevant System Settings pane.
 
 ### Changed
 - Activity and Dry Run text (file paths, messages, rule names) can now be selected and copied.
+- Import to Library now only offers Skip and Replace as conflict options (Rename removed), with Skip as the default.
+- The action kind and condition kind pickers now show SF Symbol icons and are grouped into labelled sections.
 
 ## [1.0.0] - 2026-06-21
 

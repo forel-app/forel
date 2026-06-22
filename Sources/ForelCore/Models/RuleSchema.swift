@@ -117,6 +117,25 @@ public extension ConditionKind {
         }
     }
 
+    /// SF Symbol for the condition in the kind picker.
+    var iconSystemName: String {
+        switch self {
+        case .name: return "doc"
+        case .extension_: return "puzzlepiece.extension"
+        case .kind: return "doc.viewfinder"
+        case .sizeBytes: return "externaldrive"
+        case .tags: return "tag"
+        case .colorLabel: return "paintpalette"
+        case .contents: return "text.viewfinder"
+        case .createdAt: return "calendar.badge.plus"
+        case .dateModified: return "calendar.badge.clock"
+        case .dateAdded: return "calendar.day.timeline.left"
+        case .downloadedFromWebsite: return "globe"
+        case .downloadedWithApp: return "macwindow"
+        case .rawWhereFromMetadata: return "curlybraces"
+        }
+    }
+
     /// Short explanatory note shown as a hoverable info icon next to the row,
     /// for conditions whose behavior isn't obvious from the label alone.
     /// `nil` for everything that doesn't need one — most conditions don't.
@@ -166,6 +185,8 @@ public enum ActionParam {
     public static let shortcutName = "shortcut_name"
     public static let shortcutInputMode = "shortcut_input_mode"
     public static let cleanFileName = "clean_file_name"
+    public static let libraryType = "library_type"
+    public static let targetPlaylist = "target_playlist"
 }
 
 /// The abstract shape of an action parameter; the UI maps it to a concrete editor.
@@ -176,6 +197,8 @@ public enum ActionParamKind: Sendable, Equatable {
     case colorLabel
     case script
     case shortcut
+    case libraryType
+    case playlist
 }
 
 public struct ActionParamSpec: Sendable, Equatable {
@@ -203,6 +226,7 @@ public extension ActionKind {
         case .setColorLabel: return "Set color label"
         case .runScript: return "Run script"
         case .runShortcut: return "Run shortcut"
+        case .importToLibrary: return "Import to library"
         }
     }
 
@@ -217,6 +241,7 @@ public extension ActionKind {
         case .setColorLabel: return "paintpalette"
         case .runScript: return "terminal"
         case .runShortcut: return "square.stack.3d.up"
+        case .importToLibrary: return "tray.full"
         }
     }
 
@@ -226,7 +251,7 @@ public extension ActionKind {
     /// have none, instead of showing an empty "No options" popover.
     var hasOptions: Bool {
         switch self {
-        case .moveToFolder, .copyToFolder, .runShortcut, .rename:
+        case .moveToFolder, .copyToFolder, .runShortcut, .rename, .importToLibrary:
             return true
         case .addTag, .removeTag, .setColorLabel, .runScript, .moveToTrash, .delete:
             return false
@@ -249,6 +274,9 @@ public extension ActionKind {
             return [ActionParamSpec(key: ActionParam.script, kind: .script)]
         case .runShortcut:
             return [ActionParamSpec(key: ActionParam.shortcutName, kind: .shortcut)]
+        case .importToLibrary:
+            return [ActionParamSpec(key: ActionParam.libraryType, kind: .libraryType),
+                    ActionParamSpec(key: ActionParam.targetPlaylist, kind: .playlist)]
         case .moveToTrash, .delete:
             return []
         }
@@ -270,6 +298,17 @@ public struct ConditionKindGroup: Sendable {
     }
 }
 
+/// Same as `ConditionKindGroup` but for action kinds.
+public struct ActionKindGroup: Sendable {
+    public let title: String?
+    public let kinds: [ActionKind]
+
+    public init(title: String?, kinds: [ActionKind]) {
+        self.title = title
+        self.kinds = kinds
+    }
+}
+
 /// Convenience lists, in display order, for building UI pickers.
 public enum RuleSchema {
     public static let conditionKindGroups: [ConditionKindGroup] = [
@@ -284,10 +323,15 @@ public enum RuleSchema {
 
     public static let conditionKinds: [ConditionKind] = conditionKindGroups.flatMap(\.kinds)
 
-    public static let actionKinds: [ActionKind] = [
-        .moveToFolder, .copyToFolder, .rename, .moveToTrash, .delete,
-        .addTag, .removeTag, .setColorLabel, .runScript, .runShortcut,
+    public static let actionKindGroups: [ActionKindGroup] = [
+        ActionKindGroup(title: nil, kinds: [.moveToFolder, .copyToFolder, .rename]),
+        ActionKindGroup(title: "Tags", kinds: [.addTag, .removeTag, .setColorLabel]),
+        ActionKindGroup(title: "Automation", kinds: [.runScript, .runShortcut]),
+        ActionKindGroup(title: "Disposal", kinds: [.moveToTrash, .delete]),
+        ActionKindGroup(title: "Library", kinds: [.importToLibrary]),
     ]
+
+    public static let actionKinds: [ActionKind] = actionKindGroups.flatMap(\.kinds)
 
     /// Resolves the value editor for a condition, combining the kind's base
     /// value kind with operator-specific overrides (regex / relative date).

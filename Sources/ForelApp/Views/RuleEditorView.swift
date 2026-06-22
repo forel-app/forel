@@ -1,6 +1,9 @@
 import AppKit
 import SwiftUI
 import ForelCore
+#if canImport(Photos)
+import Photos
+#endif
 
 struct RuleEditorView: View {
     @State private var rule: Rule
@@ -349,12 +352,28 @@ private struct ConditionKindMenu: View {
                 if let title = group.title {
                     Section(title) {
                         ForEach(group.kinds, id: \.self) { kind in
-                            Button(kind.label) { selection = kind }
+                            Button {
+                                selection = kind
+                            } label: {
+                                HStack {
+                                    Image(systemName: kind.iconSystemName)
+                                        .frame(width: 16)
+                                    Text(kind.label)
+                                }
+                            }
                         }
                     }
                 } else {
                     ForEach(group.kinds, id: \.self) { kind in
-                        Button(kind.label) { selection = kind }
+                        Button {
+                            selection = kind
+                        } label: {
+                            HStack {
+                                Image(systemName: kind.iconSystemName)
+                                    .frame(width: 16)
+                                Text(kind.label)
+                            }
+                        }
                     }
                 }
             }
@@ -380,8 +399,34 @@ private struct ActionKindMenu: View {
 
     var body: some View {
         RuleSelectMenu(title: selection.label) {
-            ForEach(RuleSchema.actionKinds, id: \.self) { kind in
-                Button(kind.label) { selection = kind }
+            ForEach(Array(RuleSchema.actionKindGroups.enumerated()), id: \.offset) { _, group in
+                if let title = group.title {
+                    Section(title) {
+                        ForEach(group.kinds, id: \.self) { kind in
+                            Button {
+                                selection = kind
+                            } label: {
+                                HStack {
+                                    Image(systemName: kind.iconSystemName)
+                                        .frame(width: 16)
+                                    Text(kind.label)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    ForEach(group.kinds, id: \.self) { kind in
+                        Button {
+                            selection = kind
+                        } label: {
+                            HStack {
+                                Image(systemName: kind.iconSystemName)
+                                    .frame(width: 16)
+                                Text(kind.label)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -685,6 +730,37 @@ private struct ActionRow: View {
             GlassField(placeholder: "Bash script (file path in $FOREL_FILE)", text: paramBinding(ActionParam.script))
         case .runShortcut:
             ShortcutPicker(selection: paramBinding(ActionParam.shortcutName))
+        case .importToLibrary:
+            let libTypeBinding = paramBinding(ActionParam.libraryType, defaultValue: LibraryType.music.rawValue)
+            let libType = LibraryType(rawValue: libTypeBinding.wrappedValue)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Text("Library:")
+                        .font(.system(size: 11))
+                        .foregroundStyle(ForelTheme.secondaryText)
+                        .frame(width: 52, alignment: .trailing)
+                    LibraryTypePicker(selection: libTypeBinding)
+                }
+                if libType == .music || libType == .tv {
+                    let app = libType == .music ? "Music" : "TV"
+                    HStack(spacing: 6) {
+                        Text("Playlist:")
+                            .font(.system(size: 11))
+                            .foregroundStyle(ForelTheme.secondaryText)
+                            .frame(width: 52, alignment: .trailing)
+                        PlaylistPicker(selection: paramBinding(ActionParam.targetPlaylist), app: app)
+                            .id(app)
+                    }
+                } else if libType == .photos {
+                    HStack(spacing: 6) {
+                        Text("Album:")
+                            .font(.system(size: 11))
+                            .foregroundStyle(ForelTheme.secondaryText)
+                            .frame(width: 52, alignment: .trailing)
+                        AlbumPicker(selection: paramBinding(ActionParam.targetPlaylist))
+                    }
+                }
+            }
         case .moveToTrash, .delete:
             Text("No parameters")
                 .font(.system(size: 11))
@@ -697,14 +773,18 @@ private struct ActionRow: View {
         Binding(
             get: { action.kind },
             set: { newKind in
-                action = Action(id: action.id, ruleId: action.ruleId, kind: newKind, params: .object([:]), position: action.position)
+                var params: [String: JSONValue] = [:]
+                if newKind == .importToLibrary {
+                    params[ActionParam.libraryType] = .string(LibraryType.music.rawValue)
+                }
+                action = Action(id: action.id, ruleId: action.ruleId, kind: newKind, params: .object(params), position: action.position)
             }
         )
     }
 
-    private func paramBinding(_ key: String) -> Binding<String> {
+    private func paramBinding(_ key: String, defaultValue: String = "") -> Binding<String> {
         Binding(
-            get: { action.params[key]?.stringValue ?? "" },
+            get: { action.params[key]?.stringValue ?? defaultValue },
             set: { newValue in
                 var dict: [String: JSONValue] = [:]
                 if case .object(let existing) = action.params { dict = existing }
@@ -752,7 +832,7 @@ private struct ActionOptionsView: View {
             switch action.kind {
             case .runShortcut:
                 shortcutOptions
-            case .moveToFolder, .copyToFolder:
+            case .moveToFolder, .copyToFolder, .importToLibrary:
                 conflictResolutionOptions
             case .rename:
                 renameOptions
@@ -765,14 +845,18 @@ private struct ActionOptionsView: View {
     }
 
     private var conflictResolutionOptions: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let defaultResolution = action.kind == .importToLibrary ? MoveConflictResolution.skip.rawValue : MoveConflictResolution.rename.rawValue
+        let options = action.kind == .importToLibrary
+            ? MoveConflictResolution.allCases.filter { $0 != .rename }.map(\.rawValue)
+            : MoveConflictResolution.allCases.map(\.rawValue)
+        return VStack(alignment: .leading, spacing: 6) {
             Text("If a file already exists")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(ForelTheme.secondaryText)
 
             StringSelectMenu(
-                selection: paramBinding(ActionParam.onConflict, defaultValue: MoveConflictResolution.rename.rawValue),
-                options: MoveConflictResolution.allCases.map(\.rawValue),
+                selection: paramBinding(ActionParam.onConflict, defaultValue: defaultResolution),
+                options: options,
                 label: { value in MoveConflictResolution(rawValue: value)?.label ?? value }
             )
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -887,6 +971,112 @@ private struct ShortcutPicker: View {
                 }
                 isLoading = false
             }
+        }
+    }
+}
+
+private struct LibraryTypePicker: View {
+    @Binding var selection: String
+
+    var body: some View {
+        StringSelectMenu(
+            selection: $selection,
+            options: LibraryType.allCases.map(\.rawValue),
+            label: { value in LibraryType(rawValue: value)?.label ?? value }
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct PlaylistPicker: View {
+    @Binding var selection: String
+    let app: String
+    @State private var items: [String] = [""]
+    @State private var isLoading = true
+
+    var body: some View {
+        HStack(spacing: 4) {
+            StringSelectMenu(
+                selection: $selection,
+                options: items,
+                label: { $0.isEmpty ? "None" : $0 }
+            )
+            if isLoading {
+                ProgressView()
+                    .controlSize(.small)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .task { await load() }
+    }
+
+    private func load() async {
+        let script = """
+        tell application "\(app)"
+            set playlistNames to name of every user playlist
+            set AppleScript's text item delimiters to linefeed
+            return playlistNames as string
+        end tell
+        """
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        task.arguments = ["-e", script]
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        task.standardOutput = outPipe
+        task.standardError = errPipe
+        do {
+            try task.run()
+            task.waitUntilExit()
+            let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+            let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if task.terminationStatus == 0 && !output.isEmpty {
+                let names = output.components(separatedBy: "\n").filter { !$0.isEmpty }
+                await MainActor.run { items = [""] + names }
+            }
+        } catch {}
+        await MainActor.run { isLoading = false }
+    }
+}
+
+private struct AlbumPicker: View {
+    @Binding var selection: String
+    @State private var items: [String] = [""]
+    @State private var isLoading = true
+
+    var body: some View {
+        HStack(spacing: 4) {
+            StringSelectMenu(
+                selection: $selection,
+                options: items,
+                label: { $0.isEmpty ? "None" : $0 }
+            )
+            if isLoading {
+                ProgressView()
+                    .controlSize(.small)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .task { await load() }
+    }
+
+    private func load() async {
+        await MainActor.run {
+            #if canImport(Photos)
+            let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+            guard status == .authorized || status == .limited else {
+                isLoading = false
+                return
+            }
+            let options = PHFetchOptions()
+            let collections = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: options)
+            var names: [String] = []
+            collections.enumerateObjects { collection, _, _ in
+                names.append(collection.localizedTitle ?? "Untitled")
+            }
+            items = [""] + names.sorted()
+            #endif
+            isLoading = false
         }
     }
 }
