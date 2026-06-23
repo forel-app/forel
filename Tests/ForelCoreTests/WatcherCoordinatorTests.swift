@@ -48,34 +48,31 @@ import Foundation
         let db = try makeDB()
         let dir = TempDir()
         let file = dir.file("a.txt")
-        let started = (dir.path as NSString).appendingPathComponent("started")
-        let release = (dir.path as NSString).appendingPathComponent("release")
         let folder = WatchedFolder(path: dir.path)
         try db.insertFolder(folder)
 
-        var rule = makeRule(folderId: folder.id, name: "blocking script")
+        var rule = makeRule(folderId: folder.id, name: "matching rule")
         rule.conditions = [makeCondition(.extension_, .is, "txt", ruleId: rule.id)]
-        rule.actions = [makeAction(.runScript, .object([
-            "script": .string("touch \"\(started)\"; while [ ! -f \"\(release)\" ]; do sleep 0.01; done"),
-        ]), position: 0, ruleId: rule.id)]
         try db.insertRule(rule)
 
         let coordinator = WatcherCoordinator(db: db)
+        let callbackStarted = DispatchSemaphore(value: 0)
+        let releaseCallback = DispatchSemaphore(value: 0)
+        coordinator.onRuleMatched = { _, _ in
+            callbackStarted.signal()
+            _ = releaseCallback.wait(timeout: .now() + 2)
+        }
+
         let finished = DispatchSemaphore(value: 0)
         DispatchQueue.global(qos: .userInitiated).async {
             coordinator.handle(path: file)
             finished.signal()
         }
 
-        let deadline = Date().addingTimeInterval(2)
-        while !FileManager.default.fileExists(atPath: started), Date() < deadline {
-            usleep(10_000)
-        }
-
-        #expect(FileManager.default.fileExists(atPath: started))
+        #expect(callbackStarted.wait(timeout: .now() + 2) == .success)
         #expect(coordinator.isProcessing(in: dir.path))
 
-        try "".write(toFile: release, atomically: true, encoding: .utf8)
+        releaseCallback.signal()
         #expect(finished.wait(timeout: .now() + 2) == .success)
         #expect(!coordinator.isProcessing(in: dir.path))
     }
