@@ -545,6 +545,102 @@ import Foundation
         #expect(FinderTags.currentColorName(moved) == "red")
     }
 
+    @Test func previewUncompressContinuesLaterActionsOnExtractedPath() throws {
+        let dir = TempDir()
+        let staging = dir.dir("staging")
+        try "hello".write(toFile: (staging as NSString).appendingPathComponent("report.txt"), atomically: true, encoding: .utf8)
+        let zip = (dir.path as NSString).appendingPathComponent("download.zip")
+        try makeZip(in: staging, items: ["report.txt"], destination: zip)
+        try FileManager.default.removeItem(atPath: staging)
+
+        let extracted = (dir.path as NSString).appendingPathComponent("report.txt")
+        let renamed = (dir.path as NSString).appendingPathComponent("final.txt")
+        var rule = makeRule(name: "unzip then rename", conditions: [makeCondition(.kind, .is, "archive")])
+        rule.actions = [
+            makeAction(.uncompress, .object([:]), position: 0),
+            makeAction(.rename, .object(["pattern": .string("final.txt")]), position: 1),
+        ]
+
+        let preview = RuleEngine.previewFile(path: zip, depth: 0, rules: [rule])
+
+        #expect(preview?.rules[0].actions.map(\.kind) == [.uncompress, .rename])
+        #expect(preview?.rules[0].actions.map(\.status) == [.wouldRun, .wouldRun])
+        #expect(preview?.rules[0].actions[1].sourcePath == extracted)
+        #expect(preview?.rules[0].actions[1].targetPath == renamed)
+        #expect(!FileManager.default.fileExists(atPath: extracted))
+    }
+
+    @Test func runUncompressContinuesLaterActionsOnExtractedPath() throws {
+        let dir = TempDir()
+        let staging = dir.dir("staging")
+        try "hello".write(toFile: (staging as NSString).appendingPathComponent("report.txt"), atomically: true, encoding: .utf8)
+        let zip = (dir.path as NSString).appendingPathComponent("download.zip")
+        try makeZip(in: staging, items: ["report.txt"], destination: zip)
+        try FileManager.default.removeItem(atPath: staging)
+
+        let final = (dir.path as NSString).appendingPathComponent("final.txt")
+        var rule = makeRule(name: "unzip then rename", conditions: [makeCondition(.kind, .is, "archive")])
+        rule.actions = [
+            makeAction(.uncompress, .object([:]), position: 0),
+            makeAction(.rename, .object(["pattern": .string("final.txt")]), position: 1),
+        ]
+
+        let result = RuleEngine.run(path: zip, depth: 0, rules: [rule], batchId: "batch")
+
+        #expect(result.history.map(\.actionKind) == [.uncompress, .rename])
+        #expect(result.history.allSatisfy { $0.status == .applied })
+        #expect(!FileManager.default.fileExists(atPath: zip))
+        #expect(FileManager.default.fileExists(atPath: final))
+        #expect(try String(contentsOfFile: final, encoding: .utf8) == "hello")
+    }
+
+    @Test func previewUncompressSkipConflictStopsLaterActions() throws {
+        let dir = TempDir()
+        let existing = dir.file("report.txt", contents: "existing")
+        let staging = dir.dir("staging")
+        try "new".write(toFile: (staging as NSString).appendingPathComponent("report.txt"), atomically: true, encoding: .utf8)
+        let zip = (dir.path as NSString).appendingPathComponent("download.zip")
+        try makeZip(in: staging, items: ["report.txt"], destination: zip)
+        try FileManager.default.removeItem(atPath: staging)
+
+        var rule = makeRule(name: "skip unzip then rename", conditions: [makeCondition(.kind, .is, "archive")])
+        rule.actions = [
+            makeAction(.uncompress, .object([ActionParam.onConflict: .string(MoveConflictResolution.skip.rawValue)]), position: 0),
+            makeAction(.rename, .object(["pattern": .string("final.txt")]), position: 1),
+        ]
+
+        let preview = RuleEngine.previewFile(path: zip, depth: 0, rules: [rule])
+
+        #expect(preview?.rules[0].actions.map(\.kind) == [.uncompress])
+        #expect(preview?.rules[0].actions[0].status == .wouldSkip)
+        #expect(try String(contentsOfFile: existing, encoding: .utf8) == "existing")
+    }
+
+    @Test func runUncompressSkipConflictStopsLaterActions() throws {
+        let dir = TempDir()
+        let existing = dir.file("report.txt", contents: "existing")
+        let staging = dir.dir("staging")
+        try "new".write(toFile: (staging as NSString).appendingPathComponent("report.txt"), atomically: true, encoding: .utf8)
+        let zip = (dir.path as NSString).appendingPathComponent("download.zip")
+        try makeZip(in: staging, items: ["report.txt"], destination: zip)
+        try FileManager.default.removeItem(atPath: staging)
+        let wronglyRenamedArchive = (dir.path as NSString).appendingPathComponent("final.txt")
+
+        var rule = makeRule(name: "skip unzip then rename", conditions: [makeCondition(.kind, .is, "archive")])
+        rule.actions = [
+            makeAction(.uncompress, .object([ActionParam.onConflict: .string(MoveConflictResolution.skip.rawValue)]), position: 0),
+            makeAction(.rename, .object(["pattern": .string("final.txt")]), position: 1),
+        ]
+
+        let result = RuleEngine.run(path: zip, depth: 0, rules: [rule], batchId: "batch")
+
+        #expect(result.history.map(\.actionKind) == [.uncompress])
+        #expect(result.history[0].status == .skipped)
+        #expect(FileManager.default.fileExists(atPath: zip))
+        #expect(!FileManager.default.fileExists(atPath: wronglyRenamedArchive))
+        #expect(try String(contentsOfFile: existing, encoding: .utf8) == "existing")
+    }
+
     @Test func previewRenameAfterSimulatedMoveDoesNotNeedMovedFileToExistYet() throws {
         let dir = TempDir()
         let firstDestination = dir.dir("PDF")

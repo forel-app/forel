@@ -3,9 +3,19 @@
 All notable changes to Forel are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased] - 2026-06-26
+
+### Added
+- Added an Uncompress action for ZIP archives, with conflict handling and action chaining on the extracted item.
+- Added the ability to change the path of an existing watched folder while keeping its rules.
+
+## Fixed
+- Fixed the automatic watcher potentially missing files when macOS reports dropped filesystem events by rescanning the affected folder while still skipping unchanged files.
+
 ## [1.0.2] - 2026-06-22
 
 ### Added
+- Added an Uncompress action for ZIP archives, with conflict handling and action chaining on the extracted item.
 - Added the ability to change the path of an existing watched folder while keeping its rules.
 - Added expandable rule cards that show each rule's conditions and actions directly in the rule list.
 - Each rule now shows its run count from the last 30 days, hidden when there's nothing to show, and the menu bar quick panel has a "Last 30 Days" section with success and failed totals across all rules.
