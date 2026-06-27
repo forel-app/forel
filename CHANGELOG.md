@@ -3,6 +3,11 @@
 All notable changes to Forel are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+- Fixed exact Name exclusions with file extensions being ignored when combined with other conditions.
+
 ## [1.0.3] - 2026-06-22
 
 ### Added

@@ -53,6 +53,24 @@ import Darwin
         #expect(ConditionEvaluator.evaluate(makeCondition(.contents, .contains, "paid"), path: textFile))
     }
 
+    @Test(arguments: [
+        ("Desktop.ini", "Desktop"),
+        ("report.pdf", "report"),
+        ("photo.JPG", "photo"),
+        ("archive.tar.gz", "archive.tar"),
+        ("$RECYCLE.BIN", "$RECYCLE"),
+    ])
+    func exactNameOperatorsAcceptStemOrCompleteFilename(filename: String, stem: String) {
+        let dir = TempDir()
+        let file = dir.file(filename)
+
+        #expect(ConditionEvaluator.evaluate(makeCondition(.name, .is, stem), path: file))
+        #expect(ConditionEvaluator.evaluate(makeCondition(.name, .is, filename), path: file))
+        #expect(!ConditionEvaluator.evaluate(makeCondition(.name, .isNot, stem), path: file))
+        #expect(!ConditionEvaluator.evaluate(makeCondition(.name, .isNot, filename), path: file))
+        #expect(ConditionEvaluator.evaluate(makeCondition(.name, .isNot, "different.name"), path: file))
+    }
+
     @Test func contentsConditionReadsFileAndMatchesEveryStringOperator() throws {
         let dir = TempDir()
         let file = dir.file("notes.txt", contents: "Alpha receipt\nTotal: 42 EUR\nPaid in full")
