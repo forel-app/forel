@@ -364,16 +364,17 @@ public enum ActionExecutor {
         process.environment = env
         try process.run()
 
-        let group = DispatchGroup()
-        group.enter()
-        DispatchQueue.global(qos: .utility).async {
-            process.waitUntilExit()
-            group.leave()
+        let startTime = Date()
+        while process.isRunning && Date().timeIntervalSince(startTime) < scriptDefaultTimeout {
+            Thread.sleep(forTimeInterval: 0.01)
         }
 
-        if group.wait(timeout: DispatchTime.now() + scriptDefaultTimeout) == .timedOut {
+        if process.isRunning {
             process.terminate()
-            _ = group.wait(timeout: DispatchTime.now() + 2)
+            Thread.sleep(forTimeInterval: 0.1)
+            if process.isRunning {
+                process.interrupt()
+            }
             throw ActionError("script timed out after \(Int(scriptDefaultTimeout))s")
         }
 
