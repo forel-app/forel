@@ -151,7 +151,6 @@ jobs:
             echo ""
             echo "1. Download the correct .dmg for your Mac."
             echo "2. Open it and drag **Forel** into **Applications**."
-            echo "3. Forel is signed with an Apple Developer ID certificate but is not yet notarized. If macOS blocks the first launch, right-click **Forel.app -> Open** and confirm."
             echo "__FOREL_EOF__"
           } >> "$GITHUB_OUTPUT"
 
