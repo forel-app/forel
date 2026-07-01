@@ -3,6 +3,11 @@
 All notable changes to Forel are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+- Removed the Light/Dark theme override from Settings; Forel now always follows the system appearance.
+
 ## [1.0.4] - 2026-07-01
 
 ### Changed
