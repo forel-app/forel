@@ -3,7 +3,7 @@
 All notable changes to Forel are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [1.0.4] - 2026-07-01
 
 ### Changed
 - Release downloads are now signed with an Apple Developer ID certificate and notarized by Apple so macOS can verify their publisher.
